@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.jkiss.dbeaver.ext.ydb</groupId>
+    <artifactId>ydb-dbeaver-plugin</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>DBeaver YDB Plugin</name>
+
+    <properties>
+        <tycho.version>5.0.1</tycho.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <dbeaver.p2.version>latest</dbeaver.p2.version>
+    </properties>
+
+    <modules>
+        <module>plugins/org.jkiss.dbeaver.ext.ydb</module>
+        <module>plugins/org.jkiss.dbeaver.ext.ydb.ui</module>
+        <module>features/org.jkiss.dbeaver.ext.ydb.feature</module>
+        <module>repository</module>
+        <module>tests/org.jkiss.dbeaver.ext.ydb.tests</module>
+    </modules>
+
+    <repositories>
+        <repository>
+            <id>eclipse-2025-12</id>
+            <url>https://download.eclipse.org/releases/2025-12/</url>
+            <layout>p2</layout>
+        </repository>
+        <repository>
+            <id>dbeaver-ce</id>
+            <url>https://repo.dbeaver.net/p2/ce/${dbeaver.p2.version}</url>
+            <layout>p2</layout>
+        </repository>
+    </repositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.eclipse.tycho</groupId>
+                <artifactId>tycho-maven-plugin</artifactId>
+                <version>${tycho.version}</version>
+                <extensions>true</extensions>
+            </plugin>
+            <plugin>
+                <groupId>org.eclipse.tycho</groupId>
+                <artifactId>target-platform-configuration</artifactId>
+                <version>${tycho.version}</version>
+                <configuration>
+                    <environments>
+                        <environment>
+                            <os>linux</os>
+                            <ws>gtk</ws>
+                            <arch>x86_64</arch>
+                        </environment>
+                        <environment>
+                            <os>win32</os>
+                            <ws>win32</ws>
+                            <arch>x86_64</arch>
+                        </environment>
+                        <environment>
+                            <os>macosx</os>
+                            <ws>cocoa</ws>
+                            <arch>x86_64</arch>
+                        </environment>
+                        <environment>
+                            <os>macosx</os>
+                            <ws>cocoa</ws>
+                            <arch>aarch64</arch>
+                        </environment>
+                    </environments>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.eclipse.tycho</groupId>
+                <artifactId>tycho-compiler-plugin</artifactId>
+                <version>${tycho.version}</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.eclipse.tycho</groupId>
+                <artifactId>tycho-packaging-plugin</artifactId>
+                <version>${tycho.version}</version>
+                <configuration>
+                    <format>'v'yyyyMMdd-HHmm</format>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

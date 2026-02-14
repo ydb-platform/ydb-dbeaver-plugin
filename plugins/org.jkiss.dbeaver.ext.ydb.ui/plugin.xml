@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.2"?>
+
+<plugin>
+
+    <extension point="org.jkiss.dbeaver.dataSourceView">
+        <view
+            id="org.jkiss.dbeaver.ext.ydb.dataSourceWizardView"
+            dataSource="ydb"
+            targetID="org.jkiss.dbeaver.ext.ui.newConnectionWizard"
+            label="%dialog.connection.header"
+            class="org.jkiss.dbeaver.ext.ydb.ui.YDBConnectionPage"
+            icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png">
+        </view>
+        <view
+            id="org.jkiss.dbeaver.ext.ydb.dataSourceEditorView"
+            dataSource="ydb"
+            targetID="org.jkiss.dbeaver.ext.ui.connectionEditor"
+            label="%dialog.connection.header"
+            class="org.jkiss.dbeaver.ext.ydb.ui.YDBConnectionPage"
+            icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png">
+        </view>
+    </extension>
+
+    <!-- Session Manager Editor -->
+    <extension point="org.jkiss.dbeaver.dataSourceProvider">
+        <editorContribution
+            editorId="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBSessionEditor"
+            category="connectionEditor"
+            label="%editor.session_manager.name"
+            icon="platform:/plugin/org.jkiss.dbeaver.model/icons/tree/sessions.svg">
+            <supports dataSource="ydb"/>
+        </editorContribution>
+    </extension>
+
+    <extension point="org.eclipse.ui.editors">
+        <editor
+            name="%editor.session_manager.name"
+            icon="platform:/plugin/org.jkiss.dbeaver.model/icons/tree/sessions.svg"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBSessionEditor"
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBSessionEditor"
+            contributorClass="org.jkiss.dbeaver.ui.editors.EditorSearchActionsContributor">
+        </editor>
+    </extension>
+
+    <!-- Alter Streaming Query command -->
+    <extension point="org.eclipse.ui.commands">
+        <category id="org.jkiss.dbeaver.ext.ydb" name="YDB" description="YDB Commands"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.external.datasource.create"
+                 name="%command.external_datasource.create.name"
+                 description="%command.external_datasource.create.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.streaming.query.alter"
+                 name="%command.streaming_query.alter.name"
+                 description="%command.streaming_query.alter.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.streaming.query.stop"
+                 name="%command.streaming_query.stop.name"
+                 description="%command.streaming_query.stop.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.streaming.query.start"
+                 name="%command.streaming_query.start.name"
+                 description="%command.streaming_query.start.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+    </extension>
+
+    <extension point="org.eclipse.core.expressions.propertyTesters">
+        <propertyTester
+            id="org.jkiss.dbeaver.ext.ydb.streaming.query.propertyTester"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryPropertyTester"
+            namespace="org.jkiss.dbeaver.ext.ydb.streaming.query"
+            properties="isRunning"
+            type="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+    </extension>
+
+    <extension point="org.eclipse.ui.handlers">
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExternalDataSourceCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                            <or>
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourcesFolder"/>
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourceFolder"/>
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSource"/>
+                            </or>
+                        </adapt>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.alter"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryAlterHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                            <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+                        </adapt>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.stop"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryStopHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                            <and>
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+                                <test property="org.jkiss.dbeaver.ext.ydb.streaming.query.isRunning" value="true" forcePluginActivation="true"/>
+                            </and>
+                        </adapt>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.start"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryStartHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                            <and>
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+                                <test property="org.jkiss.dbeaver.ext.ydb.streaming.query.isRunning" value="false" forcePluginActivation="true"/>
+                            </and>
+                        </adapt>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+    </extension>
+
+    <extension point="org.eclipse.ui.menus">
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=navigator_additions_end">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=navigator_additions_end">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.alter">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=navigator_additions_end">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.stop">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=navigator_additions_end">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.start">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+    </extension>
+
+    <!-- Streaming Query Editors -->
+    <extension point="org.jkiss.dbeaver.databaseEditor">
+        <editor
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.streamingQuerySource"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQuerySourceEditor"
+            label="%editor.streaming_query.source.name"
+            description="%editor.streaming_query.source.description"
+            position="additions_start"
+            type="folder"
+            icon="#sql_text"
+            contributor="org.jkiss.dbeaver.ui.editors.sql.SQLEditorContributorNested"
+            embeddable="false">
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+        </editor>
+        <editor
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.streamingQueryIssues"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryIssuesEditor"
+            label="%editor.streaming_query.issues.name"
+            description="%editor.streaming_query.issues.description"
+            position="additions_middle"
+            type="folder">
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+        </editor>
+        <editor
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.streamingQueryPlan"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryPlanEditor"
+            label="%editor.streaming_query.plan.name"
+            description="%editor.streaming_query.plan.description"
+            position="additions_middle"
+            type="folder">
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+        </editor>
+    </extension>
+
+</plugin>

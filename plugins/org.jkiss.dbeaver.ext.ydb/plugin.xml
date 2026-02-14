@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.2"?>
+
+<plugin>
+
+    <extension point="org.jkiss.dbeaver.generic.meta">
+        <meta id="ydb_jdbc"
+              class="org.jkiss.dbeaver.ext.ydb.model.YDBMetaModel"
+              driverClass="tech.ydb.jdbc.YdbDriver"/>
+    </extension>
+
+    <extension point="org.jkiss.dbeaver.dataSourceProvider">
+        <datasource
+                class="org.jkiss.dbeaver.ext.ydb.YDBDataSourceProvider"
+                description="YDB (Yandex Database)"
+                id="ydb"
+                parent="generic"
+                label="YDB"
+                icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png">
+
+            <tree path="ydb" label="YDB data source">
+                <!-- Tables folder -->
+                <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTable" label="%tree.tables.node.name" icon="#folder_table" description="%tree.tables.node.tip">
+                    <!-- Subfolders (for tables with "/" in names) -->
+                    <items label="%tree.folder.node.name" path="folder" property="tableFolders" icon="#folder_table">
+                        <!-- Nested subfolders (recursive) -->
+                        <items label="%tree.folder.node.name" path="subfolder" property="subFolders" icon="#folder_table" recursive=".."/>
+                        <!-- Tables inside folder -->
+                        <items label="%tree.table.node.name" path="table" property="tables" icon="#table">
+                            <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
+                                <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
+                            </folder>
+                            <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableIndex" label="%tree.indexes.node.name" icon="#indexes" visibleIf="object.dataSource.info.supportsIndexes()">
+                                <items label="%tree.index.node.name" path="index" property="indexes" icon="#index">
+                                    <items label="%tree.index_columns.node.name" path="column" property="attributeReferences" icon="#column" navigable="false" inline="true"/>
+                                </items>
+                            </folder>
+                        </items>
+                    </items>
+                    <!-- Root tables (without "/" in names) -->
+                    <items label="%tree.table.node.name" path="table" property="rootTables" icon="#table">
+                        <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
+                            <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
+                        </folder>
+                        <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableIndex" label="%tree.indexes.node.name" icon="#indexes" visibleIf="object.dataSource.info.supportsIndexes()">
+                            <items label="%tree.index.node.name" path="index" property="indexes" icon="#index">
+                                <items label="%tree.index_columns.node.name" path="column" property="attributeReferences" icon="#column" navigable="false" inline="true"/>
+                            </items>
+                        </folder>
+                    </items>
+                </folder>
+                <!-- System views from .sys directory (read-only) -->
+                <folder label="%tree.system_views.node.name" icon="#folder_view" description="%tree.system_views.node.tip" >
+                    <items label="%tree.system_view.node.name" path="systemView" property="systemViews" icon="#view">
+                        <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
+                            <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
+                        </folder>
+                    </items>
+                </folder>
+                <!-- Resource pools from .sys/resource_pools -->
+                <folder label="%tree.resource_pools.node.name" icon="#folder" description="%tree.resource_pools.node.tip" >
+                    <items label="%tree.resource_pool.node.name" path="resourcePool" property="resourcePools" icon="#folder"/>
+                </folder>
+                <!-- Resource pool classifiers from .sys/resource_pool_classifiers -->
+                <folder label="%tree.resource_pool_classifiers.node.name" icon="#folder" description="%tree.resource_pool_classifiers.node.tip" >
+                    <items label="%tree.resource_pool_classifier.node.name" path="resourcePoolClassifier" property="resourcePoolClassifiers" icon="#folder"/>
+                </folder>
+                <!-- Topics (PersQueueGroup) for message streaming -->
+                <folder label="%tree.topics.node.name" icon="#folder_table" description="%tree.topics.node.tip" >
+                    <!-- Subfolders (for topics with "/" in paths) -->
+                    <items label="%tree.topic_folder.node.name" path="topicFolder" property="topicFolders" icon="#folder_table">
+                        <!-- Nested subfolders (recursive) -->
+                        <items label="%tree.topic_folder.node.name" path="topicSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
+                        <!-- Topics inside folder -->
+                        <items label="%tree.topic.node.name" path="topic" property="topics" icon="#table"/>
+                    </items>
+                    <!-- Root topics (without "/" in paths) -->
+                    <items label="%tree.topic.node.name" path="topic" property="rootTopics" icon="#table"/>
+                </folder>
+                <!-- External Data Sources -->
+                <folder label="%tree.external_data_sources.node.name" icon="#folder_table" description="%tree.external_data_sources.node.tip" >
+                    <items label="%tree.external_data_source_folder.node.name" path="extDsFolder" property="externalDataSourceFolders" icon="#folder_table">
+                        <items label="%tree.external_data_source_folder.node.name" path="extDsSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
+                        <items label="%tree.external_data_source.node.name" path="extDs" property="externalDataSources" icon="#table"/>
+                    </items>
+                    <items label="%tree.external_data_source.node.name" path="extDs" property="rootExternalDataSources" icon="#table"/>
+                </folder>
+                <!-- External Tables -->
+                <folder label="%tree.external_tables.node.name" icon="#folder_table" description="%tree.external_tables.node.tip" >
+                    <items label="%tree.external_table_folder.node.name" path="extTableFolder" property="externalTableFolders" icon="#folder_table">
+                        <items label="%tree.external_table_folder.node.name" path="extTableSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
+                        <items label="%tree.external_table.node.name" path="extTable" property="externalTables" icon="#table">
+                            <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
+                                <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
+                            </folder>
+                        </items>
+                    </items>
+                    <items label="%tree.external_table.node.name" path="extTable" property="rootExternalTables" icon="#table">
+                        <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
+                            <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
+                        </folder>
+                    </items>
+                </folder>
+                <!-- Streaming queries from .sys/streaming_queries -->
+                <folder label="%tree.streaming_queries.node.name" icon="#folder" description="%tree.streaming_queries.node.tip" >
+                    <!-- Subfolders (for queries with "/" in Path) -->
+                    <items label="%tree.streaming_query_folder.node.name" path="streamingQueryFolder" property="streamingQueryFolders" icon="#folder">
+                        <!-- Nested subfolders (recursive) -->
+                        <items label="%tree.streaming_query_folder.node.name" path="streamingQuerySubFolder" property="subFolders" icon="#folder" recursive=".."/>
+                        <!-- Queries inside folder -->
+                        <items label="%tree.streaming_query.node.name" path="streamingQuery" property="queries" icon="#sql_text"/>
+                    </items>
+                    <!-- Root queries (without "/" in Path) -->
+                    <items label="%tree.streaming_query.node.name" path="streamingQuery" property="rootStreamingQueries" icon="#sql_text"/>
+                </folder>
+            </tree>
+
+            <drivers managable="true">
+                <driver
+                        id="ydb_jdbc"
+                        label="YDB"
+                        class="tech.ydb.jdbc.YdbDriver"
+                        sampleURL="jdbc:ydb:{host}[:{port}]/{database}[?param=value]"
+                        defaultPort="2135"
+                        icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png"
+                        iconBig="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon_big.png"
+                        description="YDB JDBC driver"
+                        supportedConfigurationTypes="MANUAL,URL"
+                        webURL="https://ydb.tech/"
+                        propertiesURL="https://ydb.tech/docs/en/reference/ydb-sdk/jdbc-driver"
+                        databaseDocumentationSuffixURL="YDB"
+                        categories="sql,distributed,cloud">
+                    <replace provider="generic" driver="ydb_jdbc"/>
+                    <file type="jar" path="maven:/tech.ydb.jdbc:ydb-jdbc-driver-shaded:RELEASE[2.3.8]"/>
+                    <file type="license" path="https://www.apache.org/licenses/LICENSE-2.0.txt" bundle="!drivers.ydb"/>
+                    <parameter name="supports-references" value="false"/>
+                    <parameter name="supports-indexes" value="true"/>
+                    <parameter name="supports-stored-code" value="false"/>
+                    <parameter name="supports-truncate" value="false"/>
+                    <!-- YDB JDBC driver setting -->
+                    <property name="useStreamResultSets" value="true"/>
+                    <!-- DBeaver setting: enable fetch-size by default -->
+                    <property name="@dbeaver-default-resultset.fetch.size" value="true"/>
+                </driver>
+            </drivers>
+
+        </datasource>
+    </extension>
+
+    <extension point="org.jkiss.dbeaver.sqlDialect">
+        <dialect id="ydb"
+                 parent="generic"
+                 class="org.jkiss.dbeaver.ext.ydb.model.YDBSQLDialect"
+                 label="YDB (YQL)"
+                 description="YDB Query Language dialect"
+                 icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png">
+        </dialect>
+    </extension>
+
+</plugin>

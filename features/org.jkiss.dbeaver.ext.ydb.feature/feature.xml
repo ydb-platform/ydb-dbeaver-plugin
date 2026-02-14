@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+    id="org.jkiss.dbeaver.ext.ydb.feature"
+    label="DBeaver YDB Support"
+    version="1.0.0.qualifier"
+    provider-name="DBeaver Corp">
+
+    <description>
+        YDB (Yandex Database) support for DBeaver.
+    </description>
+
+    <license url="https://www.apache.org/licenses/LICENSE-2.0">
+        Apache License, Version 2.0
+    </license>
+
+    <plugin
+        id="org.jkiss.dbeaver.ext.ydb"
+        download-size="0"
+        install-size="0"
+        version="0.0.0"
+        unpack="false"/>
+
+    <plugin
+        id="org.jkiss.dbeaver.ext.ydb.ui"
+        download-size="0"
+        install-size="0"
+        version="0.0.0"
+        unpack="false"/>
+
+</feature>

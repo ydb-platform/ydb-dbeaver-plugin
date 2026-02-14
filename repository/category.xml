@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+    <feature id="org.jkiss.dbeaver.ext.ydb.feature" version="0.0.0">
+        <category name="org.jkiss.dbeaver.ext.ydb"/>
+    </feature>
+
+    <category-def name="org.jkiss.dbeaver.ext.ydb" label="DBeaver YDB Support">
+        <description>
+            YDB (Yandex Database) support for DBeaver. Includes database connectivity, SQL dialect support, and UI components.
+        </description>
+    </category-def>
+</site>
