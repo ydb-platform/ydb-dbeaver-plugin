@@ -34,7 +34,7 @@
         </repository>
         <repository>
             <id>dbeaver-ce</id>
-            <url>https://repo.dbeaver.net/p2/ce/${dbeaver.p2.version}</url>
+            <url>https://dbeaver.io/update/ce/${dbeaver.p2.version}</url>
             <layout>p2</layout>
         </repository>
     </repositories>
