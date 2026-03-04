@@ -19,17 +19,27 @@ package org.jkiss.dbeaver.ext.ydb.model;
 import org.jkiss.code.NotNull;
 import org.jkiss.code.Nullable;
 import org.jkiss.dbeaver.DBException;
+import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.model.DBPDataSource;
+import org.jkiss.dbeaver.model.DBUtils;
+import org.jkiss.dbeaver.model.exec.jdbc.JDBCSession;
 import org.jkiss.dbeaver.model.meta.Association;
 import org.jkiss.dbeaver.model.meta.Property;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.struct.DBSFolder;
 import org.jkiss.dbeaver.model.struct.DBSObject;
+import org.jkiss.dbeaver.model.struct.DBSObjectContainer;
 
+import tech.ydb.jdbc.YdbConnection;
+import tech.ydb.jdbc.context.YdbContext;
+import tech.ydb.proto.scheme.SchemeOperationProtos;
+import tech.ydb.scheme.SchemeClient;
+
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -38,7 +48,9 @@ import java.util.TreeMap;
  * YDB virtual folder for hierarchical table organization.
  * Tables with "/" in their names are organized into nested folders.
  */
-public class YDBTableFolder implements DBSFolder {
+public class YDBTableFolder implements DBSFolder, DBSObjectContainer, YDBPermissionHolder {
+
+    private static final Log log = Log.getLog(YDBTableFolder.class);
 
     private final DBSObject owner;
     private final YDBTableFolder parentFolder;
@@ -46,6 +58,12 @@ public class YDBTableFolder implements DBSFolder {
     private final String fullPath;
     private final Map<String, YDBTableFolder> subFolders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private final List<YDBTable> tables = new ArrayList<>();
+
+    // Permissions
+    private String permOwner;
+    private List<PermissionEntry> explicitPermissions = new ArrayList<>();
+    private List<PermissionEntry> effectivePermissions = new ArrayList<>();
+    private boolean permissionsLoaded;
 
     public YDBTableFolder(
         @NotNull DBSObject owner,
@@ -107,6 +125,41 @@ public class YDBTableFolder implements DBSFolder {
         return children;
     }
 
+    @Override
+    public Collection<? extends DBSObject> getChildren(@NotNull DBRProgressMonitor monitor) throws DBException {
+        return getChildrenObjects(monitor);
+    }
+
+    @Override
+    public DBSObject getChild(@NotNull DBRProgressMonitor monitor, @NotNull String childName) throws DBException {
+        // Strip trailing "." — DBeaver core has hardcoded endsWith(".") in completion
+        String lookupName = childName;
+        if (lookupName.endsWith(".")) {
+            lookupName = lookupName.substring(0, lookupName.length() - 1);
+        }
+        YDBTableFolder sub = subFolders.get(lookupName);
+        if (sub != null) {
+            return sub;
+        }
+        for (YDBTable table : tables) {
+            if (table.getName().equalsIgnoreCase(lookupName)) {
+                return table;
+            }
+        }
+        return null;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends DBSObject> getPrimaryChildType(@Nullable DBRProgressMonitor monitor) throws DBException {
+        return YDBTable.class;
+    }
+
+    @Override
+    public void cacheStructure(@NotNull DBRProgressMonitor monitor, int scope) throws DBException {
+        // Already cached during buildHierarchy
+    }
+
     @Association
     @NotNull
     public Collection<YDBTableFolder> getSubFolders() {
@@ -131,6 +184,90 @@ public class YDBTableFolder implements DBSFolder {
 
     public boolean hasContent() {
         return !subFolders.isEmpty() || !tables.isEmpty();
+    }
+
+    // --- YDBPermissionHolder ---
+
+    @Nullable
+    @Override
+    public String getOwner() {
+        return permOwner;
+    }
+
+    @NotNull
+    @Override
+    public List<PermissionEntry> getExplicitPermissions() {
+        return explicitPermissions;
+    }
+
+    @NotNull
+    @Override
+    public List<PermissionEntry> getEffectivePermissions() {
+        return effectivePermissions;
+    }
+
+    @Override
+    public void ensurePermissionsLoaded(@NotNull DBRProgressMonitor monitor) throws DBException {
+        if (permissionsLoaded) {
+            return;
+        }
+        try (JDBCSession session = DBUtils.openMetaSession(monitor, getDataSource(), "Load permissions")) {
+            Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(YdbConnection.class)) {
+                YdbConnection ydbConn = conn.unwrap(YdbConnection.class);
+                YdbContext ctx = ydbConn.getCtx();
+                loadPermissions(ctx.getSchemeClient(), ctx.getPrefixPath());
+            }
+        } catch (Exception e) {
+            log.debug("Failed to load permissions: " + e.getMessage());
+        }
+    }
+
+    synchronized void loadPermissions(@NotNull SchemeClient schemeClient, @NotNull String prefixPath) {
+        if (permissionsLoaded) {
+            return;
+        }
+        String absolutePath = prefixPath + "/" + fullPath;
+        SchemeOperationProtos.Entry entry = YDBDescribeHelper.describePath(schemeClient, absolutePath);
+        if (entry != null) {
+            permOwner = entry.getOwner();
+            explicitPermissions = YDBDescribeHelper.toPermissionEntries(entry.getPermissionsList());
+            effectivePermissions = YDBDescribeHelper.toPermissionEntries(entry.getEffectivePermissionsList());
+        }
+        permissionsLoaded = true;
+    }
+
+    @Override
+    public void resetPermissions() {
+        permissionsLoaded = false;
+        permOwner = null;
+        explicitPermissions = new ArrayList<>();
+        effectivePermissions = new ArrayList<>();
+    }
+
+    @Override
+    public void modifyPermissions(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull List<PermissionAction> actions,
+        boolean clearPermissions,
+        @Nullable Boolean interruptInheritance
+    ) throws DBException {
+        try (JDBCSession session = DBUtils.openMetaSession(monitor, getDataSource(), "Modify permissions")) {
+            Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(YdbConnection.class)) {
+                YdbConnection ydbConn = conn.unwrap(YdbConnection.class);
+                YdbContext ctx = ydbConn.getCtx();
+                String absolutePath = ctx.getPrefixPath() + "/" + fullPath;
+                boolean ok = YDBDescribeHelper.modifyPermissions(
+                    ctx.getGrpcTransport(), absolutePath, actions, clearPermissions, interruptInheritance);
+                if (!ok) {
+                    throw new DBException("Failed to modify permissions on " + absolutePath);
+                }
+                resetPermissions();
+            }
+        } catch (SQLException e) {
+            throw new DBException("Failed to modify permissions", e);
+        }
     }
 
     @Override

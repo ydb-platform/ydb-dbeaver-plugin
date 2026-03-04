@@ -21,21 +21,36 @@ import org.jkiss.code.Nullable;
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.ext.generic.model.GenericDataSource;
-import org.jkiss.dbeaver.ext.generic.model.GenericSQLDialect;
 import org.jkiss.dbeaver.ext.generic.model.GenericTableBase;
 import org.jkiss.dbeaver.ext.generic.model.meta.GenericMetaModel;
+import org.jkiss.dbeaver.ext.ydb.model.autocomplete.YDBAutocompleteClient;
+import org.jkiss.dbeaver.ext.ydb.model.dashboard.YDBViewerClient;
 import org.jkiss.dbeaver.model.DBPDataKind;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
+import org.jkiss.dbeaver.model.connection.DBPDriver;
 import org.jkiss.dbeaver.model.DBUtils;
 import org.jkiss.dbeaver.model.connection.DBPConnectionConfiguration;
 import org.jkiss.dbeaver.model.meta.Association;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
+import org.jkiss.dbeaver.model.struct.DBSDataType;
 import org.jkiss.dbeaver.model.struct.DBSObject;
 
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCPreparedStatement;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCResultSet;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCSession;
+import org.jkiss.dbeaver.model.navigator.DBNDatabaseFolder;
+import org.jkiss.dbeaver.model.navigator.DBNDatabaseNode;
+import org.jkiss.dbeaver.model.navigator.DBNModel;
+import org.jkiss.dbeaver.model.navigator.DBNUtils;
 
+import tech.ydb.core.Result;
+import tech.ydb.jdbc.YdbConnection;
+import tech.ydb.jdbc.context.YdbContext;
+import tech.ydb.proto.scheme.SchemeOperationProtos;
+import tech.ydb.scheme.SchemeClient;
+import tech.ydb.scheme.description.ListDirectoryResult;
+
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -53,11 +68,16 @@ public class YDBDataSource extends GenericDataSource {
 
     private static final Log log = Log.getLog(YDBDataSource.class);
 
+    public static final String PROP_AUTOCOMPLETE_API_ENABLED = "ydb.autocompleteApiEnabled";
+
     private String ydbVersion = null;
+    private YDBAutocompleteClient autocompleteClient;
+    private boolean autocompleteClientInitialized = false;
 
     private Map<String, YDBTableFolder> rootFolders;
     private List<GenericTableBase> rootTables;
     private boolean hierarchyBuilt = false;
+    private boolean navigatorNodesPreloaded = false;
     private YDBSystemViewsFolder systemViewsFolder;
     private YDBResourcePoolsFolder resourcePoolsFolder;
     private YDBResourcePoolClassifiersFolder resourcePoolClassifiersFolder;
@@ -65,6 +85,8 @@ public class YDBDataSource extends GenericDataSource {
     private YDBExternalDataSourcesFolder externalDataSourcesFolder;
     private YDBExternalTablesFolder externalTablesFolder;
     private YDBStreamingQueriesFolder streamingQueriesFolder;
+    private YDBViewsFolder viewsFolder;
+    private YDBTransfersFolder transfersFolder;
 
     public YDBDataSource(
         DBRProgressMonitor monitor,
@@ -75,27 +97,61 @@ public class YDBDataSource extends GenericDataSource {
         log.debug("YDBDataSource created");
     }
 
+    @Nullable
+    public synchronized YDBAutocompleteClient getAutocompleteClient() {
+        if (autocompleteClientInitialized) {
+            return autocompleteClient;
+        }
+        autocompleteClientInitialized = true;
+        DBPConnectionConfiguration cfg = getContainer().getConnectionConfiguration();
+        String enabled = cfg.getProviderProperty(PROP_AUTOCOMPLETE_API_ENABLED);
+        if ("false".equals(enabled)) {
+            log.debug("YDB autocomplete API is disabled in connection settings");
+            return null;
+        }
+        String monitoringUrl = cfg.getProviderProperty("ydb.monitoringUrl");
+        String jdbcUrl = cfg.getUrl();
+        String host = cfg.getHostName();
+        String secureStr = cfg.getProviderProperty("ydb.useSecure");
+        boolean secure = secureStr == null || Boolean.parseBoolean(secureStr);
+        String baseUrl = YDBViewerClient.resolveBaseUrl(monitoringUrl, jdbcUrl, host, secure);
+        if (baseUrl == null) {
+            log.debug("YDB autocomplete API: cannot resolve viewer URL");
+            return null;
+        }
+        String database = cfg.getDatabaseName();
+        if (database == null || database.isEmpty()) {
+            log.debug("YDB autocomplete API: database name is empty");
+            return null;
+        }
+        String token = cfg.getProviderProperty("ydb.token");
+        autocompleteClient = new YDBAutocompleteClient(baseUrl, database, token);
+        log.debug("YDB autocomplete API initialized: " + baseUrl + " database=" + database);
+        return autocompleteClient;
+    }
+
+    @Override
+    protected String getConnectionURL(DBPConnectionConfiguration connectionInfo) {
+        // Always use our provider to build the URL with grpcs:// and auth params.
+        // super.getConnectionURL() delegates to DriverDescriptor which uses the
+        // sampleURL template and does NOT call YDBDataSourceProvider.getConnectionURL().
+        DBPDriver driver = getContainer().getDriver();
+        return driver.getDataSourceProvider().getConnectionURL(driver, connectionInfo);
+    }
+
     @Override
     protected void fillConnectionProperties(DBPConnectionConfiguration connectionInfo, Properties connectProps) {
         super.fillConnectionProperties(connectionInfo, connectProps);
 
-        // Log all properties for debugging
-        log.debug("YDB Connection properties being sent to JDBC driver:");
-        for (Map.Entry<Object, Object> entry : connectProps.entrySet()) {
-            String key = String.valueOf(entry.getKey());
-            String value = String.valueOf(entry.getValue());
-            // Mask sensitive values
-            if (key.toLowerCase().contains("password") || key.toLowerCase().contains("token")) {
-                log.debug("  " + key + " = [REDACTED, length=" + value.length() + "]");
-            } else {
-                log.debug("  " + key + " = " + value);
-            }
+        // Ensure SSL certificate is passed as a connection property
+        String sslCertificate = connectionInfo.getProviderProperty("ydb.sslCertificate");
+        if (sslCertificate != null && !sslCertificate.isEmpty()) {
+            connectProps.setProperty("secureConnectionCertificate", sslCertificate);
         }
-        log.debug("Connection URL: " + connectionInfo.getUrl());
     }
 
     /**
-     * Build folder hierarchy from flat table names.
+     * Build folder hierarchy by scanning directories via SchemeClient.
      */
     private synchronized void buildHierarchy(@NotNull DBRProgressMonitor monitor) throws DBException {
         if (hierarchyBuilt) {
@@ -105,52 +161,240 @@ public class YDBDataSource extends GenericDataSource {
         rootFolders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         rootTables = new ArrayList<>();
 
-        List<? extends GenericTableBase> allTables = super.getTables(monitor);
-        if (allTables == null || allTables.isEmpty()) {
-            hierarchyBuilt = true;
-            return;
+        List<TableEntry> tableEntries = new ArrayList<>();
+
+        try (JDBCSession session = DBUtils.openMetaSession(monitor, this, "Load tables")) {
+            Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(YdbConnection.class)) {
+                YdbConnection ydbConn = conn.unwrap(YdbConnection.class);
+                YdbContext ctx = ydbConn.getCtx();
+                SchemeClient schemeClient = ctx.getSchemeClient();
+                String prefixPath = ctx.getPrefixPath();
+
+                scanTables(schemeClient, prefixPath, "", tableEntries);
+            }
+        } catch (SQLException e) {
+            log.debug("Failed to load tables via SchemeClient: " + e.getMessage());
         }
 
-        for (GenericTableBase table : allTables) {
-            if (table instanceof YDBTable) {
-                YDBTable ydbTable = (YDBTable) table;
-                if (ydbTable.hasHierarchicalName()) {
-                    String fullName = ydbTable.getFullTableName();
-                    String[] parts = fullName.split("/");
-                    YDBTableFolder currentFolder = null;
+        for (TableEntry entry : tableEntries) {
+            String relativePath = entry.path;
+            if (relativePath.contains("/")) {
+                String[] parts = relativePath.split("/");
+                YDBTable table = new YDBTable(this, relativePath, "TABLE", null, entry.columnTable);
 
-                    // Create folder hierarchy (all parts except the last one)
-                    for (int i = 0; i < parts.length - 1; i++) {
-                        String folderName = parts[i];
-                        if (currentFolder == null) {
-                            currentFolder = rootFolders.computeIfAbsent(
-                                folderName,
-                                n -> new YDBTableFolder(this, null, n)
-                            );
-                        } else {
-                            currentFolder = currentFolder.getOrCreateSubFolder(folderName);
-                        }
+                YDBTableFolder currentFolder = null;
+                for (int i = 0; i < parts.length - 1; i++) {
+                    String folderName = parts[i];
+                    if (currentFolder == null) {
+                        currentFolder = rootFolders.computeIfAbsent(
+                            folderName,
+                            n -> new YDBTableFolder(this, null, n)
+                        );
+                    } else {
+                        currentFolder = currentFolder.getOrCreateSubFolder(folderName);
                     }
+                }
 
-                    if (currentFolder != null) {
-                        currentFolder.addTable(ydbTable);
-                    }
-                } else {
-                    rootTables.add(ydbTable);
+                if (currentFolder != null) {
+                    currentFolder.addTable(table);
                 }
             } else {
-                rootTables.add(table);
+                rootTables.add(new YDBTable(this, relativePath, "TABLE", null, entry.columnTable));
             }
         }
 
-        // Sort root tables
         rootTables.sort(Comparator.comparing(GenericTableBase::getName, String.CASE_INSENSITIVE_ORDER));
+
+        // Populate standard tableCache so DBeaver navigator/UI can find tables
+        List<GenericTableBase> allTables = new ArrayList<>(rootTables);
+        collectAllTables(rootFolders.values(), allTables);
+        getTableCache().setCache(allTables);
+
         hierarchyBuilt = true;
+    }
+
+    /**
+     * Lazily pre-load navigator tree nodes so nodeMap contains all table instances.
+     * Called from getChildren()/getChild() — NOT from buildHierarchy(),
+     * because during buildHierarchy() the navigator model is not yet ready.
+     */
+    private void ensureNavigatorNodesPreloaded(@NotNull DBRProgressMonitor monitor) {
+        if (navigatorNodesPreloaded) {
+            return;
+        }
+        preloadNavigatorNodes(monitor);
+    }
+
+    private void preloadNavigatorNodes(@NotNull DBRProgressMonitor monitor) {
+        try {
+            DBNModel navModel = DBNUtils.getNavigatorModel(this);
+            if (navModel == null) {
+                return;
+            }
+            DBNDatabaseNode dsNode = navModel.getNodeByObject(getContainer());
+            if (dsNode == null) {
+                return;
+            }
+            DBNDatabaseNode[] folders = dsNode.getChildren(monitor);
+            if (folders == null) {
+                return;
+            }
+            for (DBNDatabaseNode folder : folders) {
+                if (folder instanceof DBNDatabaseFolder) {
+                    loadNavigatorChildrenRecursively(monitor, folder);
+                }
+            }
+            navigatorNodesPreloaded = true;
+        } catch (Exception e) {
+            log.debug("preloadNavigatorNodes failed: " + e.getMessage());
+        }
+    }
+
+    private void loadNavigatorChildrenRecursively(
+            @NotNull DBRProgressMonitor monitor, @NotNull DBNDatabaseNode node) {
+        try {
+            DBNDatabaseNode[] children = node.getChildren(monitor);
+            if (children != null) {
+                for (DBNDatabaseNode child : children) {
+                    DBSObject obj = child.getObject();
+                    if (child instanceof DBNDatabaseFolder || obj instanceof YDBTableFolder) {
+                        loadNavigatorChildrenRecursively(monitor, child);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to load navigator children: " + e.getMessage());
+        }
+    }
+
+    private void collectAllTables(Collection<YDBTableFolder> folders, List<GenericTableBase> result) {
+        for (YDBTableFolder folder : folders) {
+            result.addAll(folder.getTables());
+            collectAllTables(folder.getSubFolders(), result);
+        }
+    }
+
+    private static class TableEntry {
+        final String path;
+        final boolean columnTable;
+
+        TableEntry(String path, boolean columnTable) {
+            this.path = path;
+            this.columnTable = columnTable;
+        }
+    }
+
+    private void scanTables(SchemeClient schemeClient, String basePath,
+                            String relativePath, List<TableEntry> result) {
+        String fullPath = relativePath.isEmpty() ? basePath : basePath + "/" + relativePath;
+        Result<ListDirectoryResult> listResult = schemeClient.listDirectory(fullPath).join();
+
+        if (!listResult.isSuccess()) {
+            log.debug("Failed to list directory: " + fullPath);
+            return;
+        }
+
+        for (SchemeOperationProtos.Entry entry : listResult.getValue().getChildren()) {
+            String entryPath = relativePath.isEmpty()
+                ? entry.getName()
+                : relativePath + "/" + entry.getName();
+
+            SchemeOperationProtos.Entry.Type type = entry.getType();
+            if (type == SchemeOperationProtos.Entry.Type.TABLE
+                    || type == SchemeOperationProtos.Entry.Type.COLUMN_TABLE) {
+                result.add(new TableEntry(entryPath, type == SchemeOperationProtos.Entry.Type.COLUMN_TABLE));
+                log.debug("Found table: " + entryPath + " (column=" + (type == SchemeOperationProtos.Entry.Type.COLUMN_TABLE) + ")");
+            } else if (type == SchemeOperationProtos.Entry.Type.DIRECTORY
+                    && !entry.getName().startsWith(".")) {
+                scanTables(schemeClient, basePath, entryPath, result);
+            }
+        }
+    }
+
+    @Override
+    public void cacheStructure(@NotNull DBRProgressMonitor monitor, int scope) throws DBException {
+        // Use SchemeClient-based hierarchy instead of JDBC getTables()
+        // JDBC driver recursively lists all directories including .tmp
+        // which causes UNAUTHORIZED errors
+        buildHierarchy(monitor);
+    }
+
+    @Override
+    public List<? extends GenericTableBase> getTables(DBRProgressMonitor monitor) throws DBException {
+        buildHierarchy(monitor);
+        return getTableCache().getCachedObjects();
+    }
+
+    @Override
+    public GenericTableBase getTable(DBRProgressMonitor monitor, String name) throws DBException {
+        buildHierarchy(monitor);
+        return getTableCache().getCachedObject(name);
+    }
+
+    @Override
+    public DBSObject getChild(@NotNull DBRProgressMonitor monitor, @NotNull String childName) throws DBException {
+        buildHierarchy(monitor);
+        ensureNavigatorNodesPreloaded(monitor);
+        // Strip trailing "." — DBeaver core has hardcoded endsWith(".") check in completion,
+        // so "slonn." can arrive as childName when user types "slonn." for completion
+        String lookupName = childName;
+        if (lookupName.endsWith(".")) {
+            lookupName = lookupName.substring(0, lookupName.length() - 1);
+        }
+        if (rootFolders != null) {
+            YDBTableFolder folder = rootFolders.get(lookupName);
+            if (folder != null) {
+                return folder;
+            }
+        }
+        return findTableByFullPath(lookupName);
+    }
+
+    @Nullable
+    private YDBTable findTableByFullPath(@NotNull String fullPath) {
+        if (!fullPath.contains("/")) {
+            if (rootTables != null) {
+                for (GenericTableBase table : rootTables) {
+                    if (table.getName().equalsIgnoreCase(fullPath)) {
+                        return (YDBTable) table;
+                    }
+                }
+            }
+            return null;
+        }
+        String[] parts = fullPath.split("/");
+        if (rootFolders == null || parts.length < 2) {
+            return null;
+        }
+        YDBTableFolder folder = rootFolders.get(parts[0]);
+        for (int i = 1; i < parts.length - 1 && folder != null; i++) {
+            String folderName = parts[i];
+            YDBTableFolder found = null;
+            for (YDBTableFolder sub : folder.getSubFolders()) {
+                if (sub.getName().equalsIgnoreCase(folderName)) {
+                    found = sub;
+                    break;
+                }
+            }
+            folder = found;
+        }
+        if (folder == null) {
+            return null;
+        }
+        String tableName = parts[parts.length - 1];
+        for (YDBTable table : folder.getTables()) {
+            if (table.getName().equalsIgnoreCase(tableName)) {
+                return table;
+            }
+        }
+        return null;
     }
 
     @Override
     public Collection<? extends DBSObject> getChildren(@NotNull DBRProgressMonitor monitor) throws DBException {
         buildHierarchy(monitor);
+        ensureNavigatorNodesPreloaded(monitor);
         List<DBSObject> children = new ArrayList<>();
         if (rootFolders != null) {
             children.addAll(rootFolders.values());
@@ -326,6 +570,44 @@ public class YDBDataSource extends GenericDataSource {
         return getOrCreateStreamingQueriesFolder().getRootQueries(monitor);
     }
 
+    private YDBTransfersFolder getOrCreateTransfersFolder() {
+        if (transfersFolder == null) {
+            transfersFolder = new YDBTransfersFolder(this);
+        }
+        return transfersFolder;
+    }
+
+    @Association
+    @NotNull
+    public Collection<YDBTransferFolder> getTransferFolders(@NotNull DBRProgressMonitor monitor) throws DBException {
+        return getOrCreateTransfersFolder().getTransferFolders(monitor);
+    }
+
+    @Association
+    @NotNull
+    public List<YDBTransfer> getRootTransfers(@NotNull DBRProgressMonitor monitor) throws DBException {
+        return getOrCreateTransfersFolder().getRootTransfers(monitor);
+    }
+
+    private YDBViewsFolder getOrCreateViewsFolder() {
+        if (viewsFolder == null) {
+            viewsFolder = new YDBViewsFolder(this);
+        }
+        return viewsFolder;
+    }
+
+    @Association
+    @NotNull
+    public Collection<YDBViewFolder> getViewFolders(@NotNull DBRProgressMonitor monitor) throws DBException {
+        return getOrCreateViewsFolder().getViewFolders(monitor);
+    }
+
+    @Association
+    @NotNull
+    public List<YDBView> getRootViews(@NotNull DBRProgressMonitor monitor) throws DBException {
+        return getOrCreateViewsFolder().getRootViews(monitor);
+    }
+
     @Nullable
     public YDBExternalDataSource findExternalDataSource(
             @NotNull DBRProgressMonitor monitor, @NotNull String path) throws DBException {
@@ -364,6 +646,184 @@ public class YDBDataSource extends GenericDataSource {
         return null;
     }
 
+    @Nullable
+    public DBSObject findObjectByFullPath(@NotNull DBRProgressMonitor monitor, @NotNull String path) {
+        try {
+            buildHierarchy(monitor);
+
+            // Try tables — need navigator instance via findNavObjectByPath
+            // because buildHierarchy table instances may not match nodeMap keys
+            YDBTable table = findTableByFullPath(path);
+            if (table != null) {
+                DBSObject navObj = findNavObjectByPath(monitor, path);
+                return navObj != null ? navObj : table;
+            }
+            // Try topics
+            YDBTopic topic = findTopicByFullPath(monitor, path);
+            if (topic != null) {
+                return topic;
+            }
+            // Try views
+            YDBView view = findViewByFullPath(monitor, path);
+            if (view != null) {
+                return view;
+            }
+        } catch (DBException e) {
+            log.debug("Failed to find object by path: " + path, e);
+        }
+        return null;
+    }
+
+    /**
+     * Find the navigator's own instance of an object by traversing the navigator tree.
+     * Needed for tables because GenericDataSource creates separate instances
+     * through its structureContainer, so buildHierarchy instances don't match nodeMap keys.
+     */
+    @Nullable
+    private DBSObject findNavObjectByPath(@NotNull DBRProgressMonitor monitor, @NotNull String relativePath) {
+        DBNModel navModel = DBNUtils.getNavigatorModel(this);
+        if (navModel == null) {
+            return null;
+        }
+        DBNDatabaseNode dsNode = navModel.getNodeByObject(getContainer());
+        if (dsNode == null) {
+            return null;
+        }
+        try {
+            DBNDatabaseNode[] topFolders = dsNode.getChildren(monitor);
+            if (topFolders == null) {
+                return null;
+            }
+            for (DBNDatabaseNode topFolder : topFolders) {
+                DBSObject found = searchNavTree(monitor, topFolder, relativePath);
+                if (found != null) {
+                    return found;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to find nav object by path: " + e.getMessage());
+        }
+        return null;
+    }
+
+    @Nullable
+    private DBSObject searchNavTree(
+            @NotNull DBRProgressMonitor monitor,
+            @NotNull DBNDatabaseNode node,
+            @NotNull String relativePath) throws DBException {
+        String[] parts = relativePath.split("/");
+
+        DBNDatabaseNode current = node;
+        for (int i = 0; i < parts.length; i++) {
+            String segment = parts[i];
+            DBNDatabaseNode[] children = current.getChildren(monitor);
+            if (children == null) {
+                return null;
+            }
+            DBNDatabaseNode match = null;
+            for (DBNDatabaseNode child : children) {
+                if (child.getNodeDisplayName().equalsIgnoreCase(segment)) {
+                    if (i == parts.length - 1) {
+                        return child.getObject();
+                    }
+                    match = child;
+                    break;
+                }
+            }
+            if (match == null) {
+                return null;
+            }
+            current = match;
+        }
+        return null;
+    }
+
+    @Nullable
+    private YDBTopic findTopicByFullPath(@NotNull DBRProgressMonitor monitor, @NotNull String path) throws DBException {
+        YDBTopicsFolder tf = getOrCreateTopicsFolder();
+        // Search root topics
+        for (YDBTopic topic : tf.getRootTopics(monitor)) {
+            if (topic.getFullPath().equalsIgnoreCase(path) || topic.getName().equalsIgnoreCase(path)) {
+                return topic;
+            }
+        }
+        // Search in folders
+        if (!path.contains("/")) {
+            return null;
+        }
+        String[] parts = path.split("/");
+        Collection<YDBTopicFolder> folders = tf.getTopicFolders(monitor);
+        YDBTopicFolder folder = null;
+        for (int i = 0; i < parts.length - 1; i++) {
+            String segment = parts[i];
+            YDBTopicFolder found = null;
+            Collection<YDBTopicFolder> searchIn = folder == null ? folders : folder.getSubFolders();
+            for (YDBTopicFolder f : searchIn) {
+                if (f.getName().equalsIgnoreCase(segment)) {
+                    found = f;
+                    break;
+                }
+            }
+            if (found == null) {
+                return null;
+            }
+            folder = found;
+        }
+        if (folder == null) {
+            return null;
+        }
+        String leafName = parts[parts.length - 1];
+        for (YDBTopic topic : folder.getTopics()) {
+            if (topic.getName().equalsIgnoreCase(leafName)) {
+                return topic;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private YDBView findViewByFullPath(@NotNull DBRProgressMonitor monitor, @NotNull String path) throws DBException {
+        YDBViewsFolder vf = getOrCreateViewsFolder();
+        // Search root views
+        for (YDBView view : vf.getRootViews(monitor)) {
+            if (view.getFullPath().equalsIgnoreCase(path) || view.getName().equalsIgnoreCase(path)) {
+                return view;
+            }
+        }
+        // Search in folders
+        if (!path.contains("/")) {
+            return null;
+        }
+        String[] parts = path.split("/");
+        Collection<YDBViewFolder> folders = vf.getViewFolders(monitor);
+        YDBViewFolder folder = null;
+        for (int i = 0; i < parts.length - 1; i++) {
+            String segment = parts[i];
+            YDBViewFolder found = null;
+            Collection<YDBViewFolder> searchIn = folder == null ? folders : folder.getSubFolders();
+            for (YDBViewFolder f : searchIn) {
+                if (f.getName().equalsIgnoreCase(segment)) {
+                    found = f;
+                    break;
+                }
+            }
+            if (found == null) {
+                return null;
+            }
+            folder = found;
+        }
+        if (folder == null) {
+            return null;
+        }
+        String leafName = parts[parts.length - 1];
+        for (YDBView view : folder.getViews()) {
+            if (view.getName().equalsIgnoreCase(leafName)) {
+                return view;
+            }
+        }
+        return null;
+    }
+
     @NotNull
     public String getYDBVersion(@NotNull DBRProgressMonitor monitor) throws DBException {
         if (ydbVersion != null) {
@@ -388,27 +848,33 @@ public class YDBDataSource extends GenericDataSource {
 
     public boolean isTopicReadingSupported(@NotNull DBRProgressMonitor monitor) throws DBException {
         String version = getYDBVersion(monitor);
-        if (version.contains("main")) {
-            return true;
-        }
-        try {
-            // Version format: "major.minor.patch" or similar
-            String[] parts = version.split("\\.");
-            if (parts.length >= 2) {
-                int major = Integer.parseInt(parts[0]);
-                int minor = Integer.parseInt(parts[1]);
-                return major > 26 || (major == 26 && minor >= 1);
+        if (version.startsWith("stable-")) {
+            // Version format: "stable-26-1-hotfix-2" or similar
+            try {
+                java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("^stable-(\\d+)-(\\d+)(?:-|$)")
+                    .matcher(version);
+                if (m.find()) {
+                    int major = Integer.parseInt(m.group(1));
+                    int minor = Integer.parseInt(m.group(2));
+                    return major > 26 || (major == 26 && minor >= 1);
+                }
+            } catch (NumberFormatException e) {
+                log.debug("Failed to parse YDB version: " + version);
             }
-        } catch (NumberFormatException e) {
-            log.debug("Failed to parse YDB version: " + version);
+            return false;
         }
-        return false;
+        // Non-stable builds (main, trunk, dev, etc.) — assume supported
+        return true;
     }
 
     @Override
     public synchronized DBSObject refreshObject(@NotNull DBRProgressMonitor monitor) throws DBException {
         ydbVersion = null;
+        autocompleteClient = null;
+        autocompleteClientInitialized = false;
         hierarchyBuilt = false;
+        navigatorNodesPreloaded = false;
         rootFolders = null;
         rootTables = null;
         systemViewsFolder = null;
@@ -418,7 +884,27 @@ public class YDBDataSource extends GenericDataSource {
         externalDataSourcesFolder = null;
         externalTablesFolder = null;
         streamingQueriesFolder = null;
-        return super.refreshObject(monitor);
+        viewsFolder = null;
+        transfersFolder = null;
+        DBSObject result = super.refreshObject(monitor);
+        buildHierarchy(monitor);
+        return result;
+    }
+
+    @Nullable
+    @Override
+    public DBSDataType getLocalDataType(@Nullable String typeName) {
+        if (typeName != null) {
+            String upper = typeName.toUpperCase();
+            if (upper.equals("JSON") || upper.equals("JSONDOCUMENT")) {
+                // Return null so that JDBCColumnMetaData falls back to resolveDataKind,
+                // which correctly returns CONTENT for JSON types.
+                // GenericDataType.getDataKind() uses a static method that maps VARCHAR -> STRING,
+                // which prevents ContentValueManager (and JSON editor) from being used.
+                return null;
+            }
+        }
+        return super.getLocalDataType(typeName);
     }
 
     @NotNull

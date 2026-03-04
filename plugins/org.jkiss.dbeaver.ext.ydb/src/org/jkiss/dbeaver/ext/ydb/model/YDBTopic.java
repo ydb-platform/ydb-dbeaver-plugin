@@ -29,24 +29,33 @@ import org.jkiss.dbeaver.model.exec.DBCStatistics;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCPreparedStatement;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCResultSet;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCSession;
-
-import java.sql.SQLException;
+import org.jkiss.dbeaver.model.DBUtils;
 import org.jkiss.dbeaver.model.meta.Property;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.struct.DBSDataContainer;
 import org.jkiss.dbeaver.model.struct.DBSObject;
 
+import tech.ydb.proto.scheme.SchemeOperationProtos;
+import tech.ydb.scheme.SchemeClient;
+
+import java.sql.SQLException;
+import java.util.List;
+
 /**
  * YDB Topic (PersQueueGroup).
  * Topics are used for message streaming in YDB.
  */
-public class YDBTopic implements DBSObject, DBSDataContainer {
+public class YDBTopic implements DBSObject, DBSDataContainer, YDBPermissionHolder {
 
     private static final long DEFAULT_MAX_ROWS = 200;
 
     private final DBSObject parent;
     private final String name;
     private final String fullPath;
+    private String owner;
+    private List<YDBPermissionHolder.PermissionEntry> explicitPermissions = List.of();
+    private List<YDBPermissionHolder.PermissionEntry> effectivePermissionsEntries = List.of();
+    private boolean permissionsLoaded = false;
 
     public YDBTopic(@NotNull DBSObject parent, @NotNull String fullPath) {
         this.parent = parent;
@@ -76,6 +85,92 @@ public class YDBTopic implements DBSObject, DBSDataContainer {
     @Property(viewable = true, order = 2)
     public String getFullPath() {
         return fullPath;
+    }
+
+    @Nullable
+    @Property(viewable = false, order = 100)
+    public String getOwner() {
+        return owner;
+    }
+
+    @NotNull
+    @Override
+    public List<YDBPermissionHolder.PermissionEntry> getExplicitPermissions() {
+        return explicitPermissions;
+    }
+
+    @NotNull
+    @Override
+    public List<YDBPermissionHolder.PermissionEntry> getEffectivePermissions() {
+        return effectivePermissionsEntries;
+    }
+
+    @Override
+    public void ensurePermissionsLoaded(@NotNull DBRProgressMonitor monitor) throws DBException {
+        if (permissionsLoaded) {
+            return;
+        }
+        try (JDBCSession session = DBUtils.openMetaSession(monitor, getDataSource(), "Load permissions")) {
+            java.sql.Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(tech.ydb.jdbc.YdbConnection.class)) {
+                tech.ydb.jdbc.YdbConnection ydbConn = conn.unwrap(tech.ydb.jdbc.YdbConnection.class);
+                tech.ydb.jdbc.context.YdbContext ctx = ydbConn.getCtx();
+                loadPermissions(ctx.getSchemeClient(), ctx.getPrefixPath());
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
+    synchronized void loadPermissions(
+        @NotNull SchemeClient schemeClient,
+        @NotNull String prefixPath
+    ) {
+        if (permissionsLoaded) {
+            return;
+        }
+        String absolutePath = prefixPath + "/" + fullPath;
+        SchemeOperationProtos.Entry entry = YDBDescribeHelper.describePath(schemeClient, absolutePath);
+        if (entry != null) {
+            owner = entry.getOwner();
+            explicitPermissions = YDBDescribeHelper.toPermissionEntries(entry.getPermissionsList());
+            effectivePermissionsEntries = YDBDescribeHelper.toPermissionEntries(entry.getEffectivePermissionsList());
+        }
+        permissionsLoaded = true;
+    }
+
+    @Override
+    public void resetPermissions() {
+        permissionsLoaded = false;
+        owner = null;
+        explicitPermissions = new java.util.ArrayList<>();
+        effectivePermissionsEntries = new java.util.ArrayList<>();
+    }
+
+    @Override
+    public void modifyPermissions(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull java.util.List<YDBPermissionHolder.PermissionAction> actions,
+        boolean clearPermissions,
+        @Nullable Boolean interruptInheritance
+    ) throws DBException {
+        try (org.jkiss.dbeaver.model.exec.jdbc.JDBCSession session =
+                 org.jkiss.dbeaver.model.DBUtils.openMetaSession(monitor, getDataSource(), "Modify permissions")) {
+            java.sql.Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(tech.ydb.jdbc.YdbConnection.class)) {
+                tech.ydb.jdbc.YdbConnection ydbConn = conn.unwrap(tech.ydb.jdbc.YdbConnection.class);
+                tech.ydb.jdbc.context.YdbContext ctx = ydbConn.getCtx();
+                String absolutePath = ctx.getPrefixPath() + "/" + fullPath;
+                boolean ok = YDBDescribeHelper.modifyPermissions(
+                    ctx.getGrpcTransport(), absolutePath, actions, clearPermissions, interruptInheritance);
+                if (!ok) {
+                    throw new DBException("Failed to modify permissions on " + absolutePath);
+                }
+                resetPermissions();
+            }
+        } catch (java.sql.SQLException e) {
+            throw new DBException("Failed to modify permissions", e);
+        }
     }
 
     @Nullable

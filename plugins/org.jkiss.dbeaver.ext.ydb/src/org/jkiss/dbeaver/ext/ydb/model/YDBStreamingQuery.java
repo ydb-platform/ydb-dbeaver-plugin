@@ -98,7 +98,6 @@ public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScript
     }
 
     @NotNull
-    @Property(viewable = true, order = 2)
     public String getFullPath() {
         return fullPath;
     }
@@ -163,7 +162,10 @@ public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScript
     @NotNull
     @Override
     public String getObjectDefinitionText(@NotNull DBRProgressMonitor monitor, @NotNull Map<String, Object> options) {
-        return queryText != null ? queryText : "";
+        if (queryText == null || queryText.isEmpty()) {
+            return "";
+        }
+        return "CREATE STREAMING QUERY `" + fullPath + "` AS\nDO BEGIN\n" + queryText + "\nEND DO";
     }
 
     @Nullable

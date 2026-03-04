@@ -20,7 +20,7 @@
 
             <tree path="ydb" label="YDB data source">
                 <!-- Tables folder -->
-                <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTable" label="%tree.tables.node.name" icon="#folder_table" description="%tree.tables.node.tip">
+                <folder id="ydbTables" type="org.jkiss.dbeaver.ext.ydb.model.YDBTable" label="%tree.tables.node.name" icon="#folder_table" description="%tree.tables.node.tip">
                     <!-- Subfolders (for tables with "/" in names) -->
                     <items label="%tree.folder.node.name" path="folder" property="tableFolders" icon="#folder_table">
                         <!-- Nested subfolders (recursive) -->
@@ -30,22 +30,12 @@
                             <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
                                 <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
                             </folder>
-                            <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableIndex" label="%tree.indexes.node.name" icon="#indexes" visibleIf="object.dataSource.info.supportsIndexes()">
-                                <items label="%tree.index.node.name" path="index" property="indexes" icon="#index">
-                                    <items label="%tree.index_columns.node.name" path="column" property="attributeReferences" icon="#column" navigable="false" inline="true"/>
-                                </items>
-                            </folder>
                         </items>
                     </items>
                     <!-- Root tables (without "/" in names) -->
                     <items label="%tree.table.node.name" path="table" property="rootTables" icon="#table">
                         <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
                             <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
-                        </folder>
-                        <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableIndex" label="%tree.indexes.node.name" icon="#indexes" visibleIf="object.dataSource.info.supportsIndexes()">
-                            <items label="%tree.index.node.name" path="index" property="indexes" icon="#index">
-                                <items label="%tree.index_columns.node.name" path="column" property="attributeReferences" icon="#column" navigable="false" inline="true"/>
-                            </items>
                         </folder>
                     </items>
                 </folder>
@@ -66,7 +56,7 @@
                     <items label="%tree.resource_pool_classifier.node.name" path="resourcePoolClassifier" property="resourcePoolClassifiers" icon="#folder"/>
                 </folder>
                 <!-- Topics (PersQueueGroup) for message streaming -->
-                <folder label="%tree.topics.node.name" icon="#folder_table" description="%tree.topics.node.tip" >
+                <folder id="ydbTopics" label="%tree.topics.node.name" icon="#folder_table" description="%tree.topics.node.tip" >
                     <!-- Subfolders (for topics with "/" in paths) -->
                     <items label="%tree.topic_folder.node.name" path="topicFolder" property="topicFolders" icon="#folder_table">
                         <!-- Nested subfolders (recursive) -->
@@ -77,8 +67,20 @@
                     <!-- Root topics (without "/" in paths) -->
                     <items label="%tree.topic.node.name" path="topic" property="rootTopics" icon="#table"/>
                 </folder>
+                <!-- Transfers for data replication -->
+                <folder id="ydbTransfers" label="%tree.transfers.node.name" icon="#folder_table" description="%tree.transfers.node.tip" >
+                    <!-- Subfolders (for transfers with "/" in paths) -->
+                    <items label="%tree.transfer_folder.node.name" path="transferFolder" property="transferFolders" icon="#folder_table">
+                        <!-- Nested subfolders (recursive) -->
+                        <items label="%tree.transfer_folder.node.name" path="transferSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
+                        <!-- Transfers inside folder -->
+                        <items label="%tree.transfer.node.name" path="transfer" property="transfers" icon="#table"/>
+                    </items>
+                    <!-- Root transfers (without "/" in paths) -->
+                    <items label="%tree.transfer.node.name" path="transfer" property="rootTransfers" icon="#table"/>
+                </folder>
                 <!-- External Data Sources -->
-                <folder label="%tree.external_data_sources.node.name" icon="#folder_table" description="%tree.external_data_sources.node.tip" >
+                <folder id="ydbExternalDataSources" label="%tree.external_data_sources.node.name" icon="#folder_table" description="%tree.external_data_sources.node.tip" >
                     <items label="%tree.external_data_source_folder.node.name" path="extDsFolder" property="externalDataSourceFolders" icon="#folder_table">
                         <items label="%tree.external_data_source_folder.node.name" path="extDsSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
                         <items label="%tree.external_data_source.node.name" path="extDs" property="externalDataSources" icon="#table"/>
@@ -86,7 +88,7 @@
                     <items label="%tree.external_data_source.node.name" path="extDs" property="rootExternalDataSources" icon="#table"/>
                 </folder>
                 <!-- External Tables -->
-                <folder label="%tree.external_tables.node.name" icon="#folder_table" description="%tree.external_tables.node.tip" >
+                <folder id="ydbExternalTables" label="%tree.external_tables.node.name" icon="#folder_table" description="%tree.external_tables.node.tip" >
                     <items label="%tree.external_table_folder.node.name" path="extTableFolder" property="externalTableFolders" icon="#folder_table">
                         <items label="%tree.external_table_folder.node.name" path="extTableSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
                         <items label="%tree.external_table.node.name" path="extTable" property="externalTables" icon="#table">
@@ -101,8 +103,16 @@
                         </folder>
                     </items>
                 </folder>
+                <!-- Views -->
+                <folder id="ydbViews" label="%tree.views.node.name" icon="#folder_view" description="%tree.views.node.tip">
+                    <items label="%tree.view_folder.node.name" path="viewFolder" property="viewFolders" icon="#folder_view">
+                        <items label="%tree.view_folder.node.name" path="viewSubFolder" property="subFolders" icon="#folder_view" recursive=".."/>
+                        <items label="%tree.view.node.name" path="view" property="views" icon="#view"/>
+                    </items>
+                    <items label="%tree.view.node.name" path="view" property="rootViews" icon="#view"/>
+                </folder>
                 <!-- Streaming queries from .sys/streaming_queries -->
-                <folder label="%tree.streaming_queries.node.name" icon="#folder" description="%tree.streaming_queries.node.tip" >
+                <folder id="ydbStreamingQueries" label="%tree.streaming_queries.node.name" icon="#folder" description="%tree.streaming_queries.node.tip" >
                     <!-- Subfolders (for queries with "/" in Path) -->
                     <items label="%tree.streaming_query_folder.node.name" path="streamingQueryFolder" property="streamingQueryFolders" icon="#folder">
                         <!-- Nested subfolders (recursive) -->
@@ -120,7 +130,7 @@
                         id="ydb_jdbc"
                         label="YDB"
                         class="tech.ydb.jdbc.YdbDriver"
-                        sampleURL="jdbc:ydb:{host}[:{port}]/{database}[?param=value]"
+                        sampleURL="jdbc:ydb:{host}[:{port}]{database}[?param=value]"
                         defaultPort="2135"
                         icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png"
                         iconBig="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon_big.png"
@@ -131,10 +141,10 @@
                         databaseDocumentationSuffixURL="YDB"
                         categories="sql,distributed,cloud">
                     <replace provider="generic" driver="ydb_jdbc"/>
-                    <file type="jar" path="maven:/tech.ydb.jdbc:ydb-jdbc-driver-shaded:RELEASE[2.3.8]"/>
+                    <file type="jar" path="maven:/tech.ydb.jdbc:ydb-jdbc-driver-shaded:RELEASE[2.3.10]"/>
                     <file type="license" path="https://www.apache.org/licenses/LICENSE-2.0.txt" bundle="!drivers.ydb"/>
                     <parameter name="supports-references" value="false"/>
-                    <parameter name="supports-indexes" value="true"/>
+                    <parameter name="supports-indexes" value="false"/>
                     <parameter name="supports-stored-code" value="false"/>
                     <parameter name="supports-truncate" value="false"/>
                     <!-- YDB JDBC driver setting -->
@@ -155,6 +165,17 @@
                  description="YDB Query Language dialect"
                  icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png">
         </dialect>
+    </extension>
+
+    <extension point="org.jkiss.dbeaver.dataTypeProvider">
+        <provider
+                class="org.jkiss.dbeaver.ext.ydb.model.data.YDBValueHandlerProvider"
+                description="YDB data type provider"
+                id="ydb"
+                label="YDB data types">
+            <datasource id="ydb"/>
+            <type name="*"/>
+        </provider>
     </extension>
 
 </plugin>

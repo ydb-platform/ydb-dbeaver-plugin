@@ -33,17 +33,17 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * Custom SWT Canvas that draws a YDB execution plan as a graphical diagram
- * with compact boxes connected by lines.
+ * Custom SWT Canvas that draws a YDB execution plan as a horizontal graphical diagram
+ * with compact boxes connected by lines. The tree grows left-to-right.
  * <p>
- * Hover shows a minimal tooltip. Click selects a node and notifies the listener.
+ * Hover shows a minimal tooltip. Click or keyboard arrows select a node and notify the listener.
  */
 public class YDBPlanDiagramViewer extends Canvas {
 
     private static final int NODE_PADDING_X = 12;
     private static final int NODE_PADDING_Y = 8;
-    private static final int NODE_H_GAP = 30;
-    private static final int NODE_V_GAP = 40;
+    private static final int NODE_H_GAP = 40;
+    private static final int NODE_V_GAP = 20;
     private static final int ARC_SIZE = 12;
     private static final int MARGIN = 30;
     private static final int ROOT_CIRCLE_RADIUS = 16;
@@ -117,14 +117,17 @@ public class YDBPlanDiagramViewer extends Canvas {
         addMouseListener(new org.eclipse.swt.events.MouseAdapter() {
             @Override
             public void mouseDown(MouseEvent e) {
+                setFocus();
                 YDBPlanNode node = hitTest(e.x, e.y);
-                if (node != selectedNode) {
-                    selectedNode = node;
-                    redraw();
-                    if (nodeSelectionListener != null) {
-                        nodeSelectionListener.accept(node);
-                    }
-                }
+                selectNode(node);
+            }
+        });
+
+        // Keyboard navigation
+        addKeyListener(new org.eclipse.swt.events.KeyAdapter() {
+            @Override
+            public void keyPressed(org.eclipse.swt.events.KeyEvent e) {
+                handleKeyNavigation(e.keyCode);
             }
         });
     }
@@ -141,6 +144,117 @@ public class YDBPlanDiagramViewer extends Canvas {
         originY = 0;
         updateScrollBars();
         redraw();
+    }
+
+    private void selectNode(@Nullable YDBPlanNode node) {
+        if (node != selectedNode) {
+            selectedNode = node;
+            if (node != null) {
+                ensureNodeVisible(node);
+            }
+            redraw();
+            if (nodeSelectionListener != null) {
+                nodeSelectionListener.accept(node);
+            }
+        }
+    }
+
+    private void ensureNodeVisible(@NotNull YDBPlanNode node) {
+        Rectangle bounds = nodeBounds.get(node);
+        if (bounds == null) {
+            return;
+        }
+        Rectangle client = getClientArea();
+        int nodeScreenX = bounds.x + originX;
+        int nodeScreenY = bounds.y + originY;
+
+        boolean changed = false;
+        if (nodeScreenX < 0) {
+            originX = -bounds.x;
+            changed = true;
+        } else if (nodeScreenX + bounds.width > client.width) {
+            originX = client.width - bounds.x - bounds.width;
+            changed = true;
+        }
+        if (nodeScreenY < 0) {
+            originY = -bounds.y;
+            changed = true;
+        } else if (nodeScreenY + bounds.height > client.height) {
+            originY = client.height - bounds.y - bounds.height;
+            changed = true;
+        }
+        if (changed) {
+            updateScrollBars();
+        }
+    }
+
+    // --- Keyboard navigation ---
+
+    private void handleKeyNavigation(int keyCode) {
+        if (rootNodes.isEmpty()) {
+            return;
+        }
+        if (selectedNode == null) {
+            selectNode(rootNodes.get(0));
+            return;
+        }
+
+        YDBPlanNode target = null;
+        switch (keyCode) {
+            case SWT.ARROW_LEFT:
+                // Go to parent
+                target = getParentNode(selectedNode);
+                break;
+            case SWT.ARROW_RIGHT:
+                // Go to first child
+                Collection<YDBPlanNode> children = selectedNode.getNested();
+                if (!children.isEmpty()) {
+                    target = children.iterator().next();
+                }
+                break;
+            case SWT.ARROW_UP:
+                // Go to previous sibling
+                target = getSibling(selectedNode, -1);
+                break;
+            case SWT.ARROW_DOWN:
+                // Go to next sibling
+                target = getSibling(selectedNode, 1);
+                break;
+            default:
+                return;
+        }
+        if (target != null) {
+            selectNode(target);
+        }
+    }
+
+    @Nullable
+    private YDBPlanNode getParentNode(@NotNull YDBPlanNode node) {
+        Object parent = node.getParent();
+        if (parent instanceof YDBPlanNode) {
+            return (YDBPlanNode) parent;
+        }
+        return null;
+    }
+
+    @Nullable
+    private YDBPlanNode getSibling(@NotNull YDBPlanNode node, int direction) {
+        YDBPlanNode parentNode = getParentNode(node);
+        List<YDBPlanNode> siblings;
+        if (parentNode != null) {
+            siblings = new ArrayList<>(parentNode.getNested());
+        } else {
+            siblings = rootNodes;
+        }
+        int idx = siblings.indexOf(node);
+        if (idx < 0) {
+            return null;
+        }
+        int newIdx = idx + direction;
+        if (newIdx >= 0 && newIdx < siblings.size()) {
+            return siblings.get(newIdx);
+        }
+        return null;
     }
 
     // --- Hit testing ---
@@ -202,7 +316,7 @@ public class YDBPlanDiagramViewer extends Canvas {
         }
     }
 
-    // --- Layout ---
+    // --- Layout (horizontal: left-to-right) ---
 
     private void layoutDiagram() {
         ensureFonts();
@@ -215,10 +329,10 @@ public class YDBPlanDiagramViewer extends Canvas {
             for (YDBPlanNode root : rootNodes) {
                 measureNode(gc, root, counter);
             }
-            int y = MARGIN + ROOT_CIRCLE_RADIUS * 2 + LINE_FROM_CIRCLE;
+            int x = MARGIN + ROOT_CIRCLE_RADIUS * 2 + LINE_FROM_CIRCLE;
             for (YDBPlanNode root : rootNodes) {
-                int subtreeWidth = getSubtreeWidth(root);
-                int x = MARGIN + subtreeWidth / 2 - nodeBounds.get(root).width / 2;
+                int subtreeHeight = getSubtreeHeight(root);
+                int y = MARGIN + subtreeHeight / 2 - nodeBounds.get(root).height / 2;
                 positionNode(root, x, y);
             }
             totalWidth = 0;
@@ -276,19 +390,19 @@ public class YDBPlanDiagramViewer extends Canvas {
         return null;
     }
 
-    private int getSubtreeWidth(YDBPlanNode node) {
+    private int getSubtreeHeight(YDBPlanNode node) {
         Collection<YDBPlanNode> children = node.getNested();
         if (children.isEmpty()) {
-            return nodeBounds.get(node).width;
+            return nodeBounds.get(node).height;
         }
-        int childrenTotalWidth = 0;
+        int childrenTotalHeight = 0;
         for (YDBPlanNode child : children) {
-            if (childrenTotalWidth > 0) {
-                childrenTotalWidth += NODE_H_GAP;
+            if (childrenTotalHeight > 0) {
+                childrenTotalHeight += NODE_V_GAP;
             }
-            childrenTotalWidth += getSubtreeWidth(child);
+            childrenTotalHeight += getSubtreeHeight(child);
         }
-        return Math.max(nodeBounds.get(node).width, childrenTotalWidth);
+        return Math.max(nodeBounds.get(node).height, childrenTotalHeight);
     }
 
     private void positionNode(YDBPlanNode node, int x, int y) {
@@ -301,23 +415,23 @@ public class YDBPlanDiagramViewer extends Canvas {
             return;
         }
 
-        int childY = y + bounds.height + NODE_V_GAP;
-        int nodeCenterX = x + bounds.width / 2;
-        int childrenTotalWidth = 0;
+        int childX = x + bounds.width + NODE_H_GAP;
+        int nodeCenterY = y + bounds.height / 2;
+        int childrenTotalHeight = 0;
         for (YDBPlanNode child : children) {
-            if (childrenTotalWidth > 0) {
-                childrenTotalWidth += NODE_H_GAP;
+            if (childrenTotalHeight > 0) {
+                childrenTotalHeight += NODE_V_GAP;
             }
-            childrenTotalWidth += getSubtreeWidth(child);
+            childrenTotalHeight += getSubtreeHeight(child);
         }
 
-        int childX = nodeCenterX - childrenTotalWidth / 2;
+        int childY = nodeCenterY - childrenTotalHeight / 2;
         for (YDBPlanNode child : children) {
-            int childSubtreeWidth = getSubtreeWidth(child);
+            int childSubtreeHeight = getSubtreeHeight(child);
             Rectangle childBounds = nodeBounds.get(child);
-            int cx = childX + childSubtreeWidth / 2 - childBounds.width / 2;
-            positionNode(child, cx, childY);
-            childX += childSubtreeWidth + NODE_H_GAP;
+            int cy = childY + childSubtreeHeight / 2 - childBounds.height / 2;
+            positionNode(child, childX, cy);
+            childY += childSubtreeHeight + NODE_V_GAP;
         }
     }
 
@@ -339,24 +453,24 @@ public class YDBPlanDiagramViewer extends Canvas {
             return;
         }
 
-        // Root circle
+        // Root circle (on the left)
         for (YDBPlanNode root : rootNodes) {
             Rectangle bounds = nodeBounds.get(root);
             if (bounds == null) continue;
-            int cx = originX + bounds.x + bounds.width / 2;
-            int circleY = originY + MARGIN;
+            int cy = originY + bounds.y + bounds.height / 2;
+            int circleX = originX + MARGIN;
 
             gc.setBackground(getDisplay().getSystemColor(SWT.COLOR_WHITE));
             gc.setForeground(getDisplay().getSystemColor(SWT.COLOR_GRAY));
             gc.setLineWidth(2);
-            gc.drawOval(cx - ROOT_CIRCLE_RADIUS, circleY,
+            gc.drawOval(circleX, cy - ROOT_CIRCLE_RADIUS,
                 ROOT_CIRCLE_RADIUS * 2, ROOT_CIRCLE_RADIUS * 2);
 
             gc.setLineWidth(1);
-            gc.drawLine(cx, circleY + ROOT_CIRCLE_RADIUS * 2, cx, originY + bounds.y);
+            gc.drawLine(circleX + ROOT_CIRCLE_RADIUS * 2, cy, originX + bounds.x, cy);
         }
 
-        // Edges
+        // Edges (horizontal: parent right side -> child left side)
         gc.setForeground(getDisplay().getSystemColor(SWT.COLOR_GRAY));
         gc.setLineWidth(1);
         for (Map.Entry<YDBPlanNode, Rectangle> entry : nodeBounds.entrySet()) {
@@ -365,10 +479,10 @@ public class YDBPlanDiagramViewer extends Canvas {
             for (YDBPlanNode child : node.getNested()) {
                 Rectangle childBounds = nodeBounds.get(child);
                 if (childBounds == null) continue;
-                int px = originX + parentBounds.x + parentBounds.width / 2;
-                int py = originY + parentBounds.y + parentBounds.height;
-                int chx = originX + childBounds.x + childBounds.width / 2;
-                int chy = originY + childBounds.y;
+                int px = originX + parentBounds.x + parentBounds.width;
+                int py = originY + parentBounds.y + parentBounds.height / 2;
+                int chx = originX + childBounds.x;
+                int chy = originY + childBounds.y + childBounds.height / 2;
                 gc.drawLine(px, py, chx, chy);
             }
         }

@@ -27,12 +27,17 @@ public class YDBUIMessages extends NLS {
     public static String dialog_connection_auth_token;
     public static String dialog_connection_auth_service_account;
     public static String dialog_connection_auth_metadata;
-    public static String dialog_connection_auth_env;
     public static String dialog_connection_token;
     public static String dialog_connection_token_tip;
     public static String dialog_connection_sa_file;
     public static String dialog_connection_sa_file_tip;
     public static String dialog_connection_use_secure;
+    public static String dialog_connection_monitoring_port;
+    public static String dialog_connection_monitoring_port_tip;
+    public static String dialog_connection_autocomplete_api;
+    public static String dialog_connection_autocomplete_api_tip;
+    public static String dialog_connection_ssl_certificate;
+    public static String dialog_connection_ssl_certificate_tip;
 
     static {
         NLS.initializeMessages(BUNDLE_NAME, YDBUIMessages.class);

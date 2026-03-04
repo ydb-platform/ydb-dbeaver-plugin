@@ -24,7 +24,6 @@ import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.*;
-import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
 import org.jkiss.dbeaver.model.connection.DBPConnectionConfiguration;
 import org.jkiss.dbeaver.ui.IDialogPageProvider;
@@ -33,6 +32,8 @@ import org.jkiss.dbeaver.ui.dialogs.connection.ConnectionPageAbstract;
 import org.jkiss.dbeaver.ui.dialogs.connection.DriverPropertiesDialogPage;
 import org.jkiss.utils.CommonUtils;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 /**
@@ -40,25 +41,26 @@ import java.util.Locale;
  */
 public class YDBConnectionPage extends ConnectionPageAbstract implements IDialogPageProvider {
 
-    private static final Log log = Log.getLog(YDBConnectionPage.class);
-
     // Auth types
     private static final String AUTH_ANONYMOUS = "anonymous";
     private static final String AUTH_STATIC = "static";
     private static final String AUTH_TOKEN = "token";
     private static final String AUTH_SERVICE_ACCOUNT = "saFile";
     private static final String AUTH_METADATA = "metadata";
-    private static final String AUTH_ENV = "env";
 
     // Provider properties
     public static final String PROP_AUTH_TYPE = "ydb.authType";
     public static final String PROP_TOKEN = "ydb.token";
     public static final String PROP_SA_FILE = "ydb.saFile";
     public static final String PROP_USE_SECURE = "ydb.useSecure";
+    public static final String PROP_MONITORING_URL = "ydb.monitoringUrl";
+    public static final String PROP_AUTOCOMPLETE_API_ENABLED = "ydb.autocompleteApiEnabled";
+    public static final String PROP_SSL_CERTIFICATE = "ydb.sslCertificate";
 
     private Text hostText;
     private Text portText;
     private Text databaseText;
+    private Text monitoringUrlText;
     private Combo authTypeCombo;
     private Text userText;
     private Text passwordText;
@@ -66,6 +68,11 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
     private Text saFileText;
     private Button saFileBrowseButton;
     private Button useSecureCheckbox;
+    private Button autocompleteApiCheckbox;
+    private Text sslCertificateText;
+    private Button sslCertificateBrowseButton;
+    private Label sslCertificateLabel;
+    private Composite sslCertComposite;
 
     private Composite credentialsGroup;
     private Composite tokenGroup;
@@ -76,8 +83,7 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         AUTH_STATIC,
         AUTH_TOKEN,
         AUTH_SERVICE_ACCOUNT,
-        AUTH_METADATA,
-        AUTH_ENV
+        AUTH_METADATA
     };
 
     private final String[] authTypeLabels = {
@@ -85,8 +91,7 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         YDBUIMessages.dialog_connection_auth_static,
         YDBUIMessages.dialog_connection_auth_token,
         YDBUIMessages.dialog_connection_auth_service_account,
-        YDBUIMessages.dialog_connection_auth_metadata,
-        YDBUIMessages.dialog_connection_auth_env
+        YDBUIMessages.dialog_connection_auth_metadata
     };
 
     @Override
@@ -125,6 +130,15 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         databaseText.setLayoutData(gd);
         databaseText.addModifyListener(textListener);
 
+        // Monitoring URL
+        UIUtils.createControlLabel(connectionGroup, YDBUIMessages.dialog_connection_monitoring_port);
+        monitoringUrlText = new Text(connectionGroup, SWT.BORDER);
+        gd = new GridData(GridData.FILL_HORIZONTAL);
+        gd.horizontalSpan = 3;
+        monitoringUrlText.setLayoutData(gd);
+        monitoringUrlText.setToolTipText(YDBUIMessages.dialog_connection_monitoring_port_tip);
+        monitoringUrlText.addModifyListener(textListener);
+
         // Use secure connection
         useSecureCheckbox = UIUtils.createCheckbox(connectionGroup,
             YDBUIMessages.dialog_connection_use_secure,
@@ -134,10 +148,46 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         useSecureCheckbox.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
+                updateSslCertControls();
                 updateUrl();
                 site.updateButtons();
             }
         });
+
+        // Custom SSL certificate
+        sslCertificateLabel = UIUtils.createControlLabel(connectionGroup, YDBUIMessages.dialog_connection_ssl_certificate);
+        sslCertComposite = new Composite(connectionGroup, SWT.NONE);
+        gd = new GridData(GridData.FILL_HORIZONTAL);
+        gd.horizontalSpan = 3;
+        sslCertComposite.setLayoutData(gd);
+        sslCertComposite.setLayout(new GridLayout(2, false));
+
+        sslCertificateText = new Text(sslCertComposite, SWT.BORDER);
+        sslCertificateText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        sslCertificateText.setToolTipText(YDBUIMessages.dialog_connection_ssl_certificate_tip);
+        sslCertificateText.addModifyListener(textListener);
+
+        sslCertificateBrowseButton = new Button(sslCertComposite, SWT.PUSH);
+        sslCertificateBrowseButton.setText("...");
+        sslCertificateBrowseButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                FileDialog dialog = new FileDialog(getShell(), SWT.OPEN);
+                dialog.setFilterExtensions(new String[]{"*.pem", "*.crt", "*.cer", "*.der", "*.*"});
+                dialog.setFilterNames(new String[]{"PEM Files", "CRT Files", "CER Files", "DER Files", "All Files"});
+                String file = dialog.open();
+                if (file != null) {
+                    sslCertificateText.setText(file);
+                }
+            }
+        });
+
+        // Enable autocomplete API
+        autocompleteApiCheckbox = UIUtils.createCheckbox(connectionGroup,
+            YDBUIMessages.dialog_connection_autocomplete_api,
+            YDBUIMessages.dialog_connection_autocomplete_api_tip,
+            true,
+            4);
 
         // Authentication group
         Group authGroup = UIUtils.createControlGroup(control, "Authentication", 2, GridData.FILL_HORIZONTAL, 0);
@@ -219,8 +269,21 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         // Set default auth type and update visibility
         authTypeCombo.select(0);
         updateAuthControls();
+        updateSslCertControls();
 
         setControl(control);
+    }
+
+    private void updateSslCertControls() {
+        boolean secure = useSecureCheckbox.getSelection();
+        setWidgetVisible(sslCertificateLabel, secure);
+        setWidgetVisible(sslCertComposite, secure);
+        sslCertificateLabel.getParent().layout(true, true);
+    }
+
+    private void setWidgetVisible(Control widget, boolean visible) {
+        widget.setVisible(visible);
+        ((GridData) widget.getLayoutData()).exclude = !visible;
     }
 
     private void updateAuthControls() {
@@ -264,9 +327,8 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             url.append(":").append(port);
         }
         if (!CommonUtils.isEmpty(database)) {
-            if (!database.startsWith("/")) {
-                url.append("/");
-            }
+            // Normalize: ensure single leading slash
+            database = "/" + database.replaceAll("^/+", "");
             url.append(database);
         }
 
@@ -296,14 +358,11 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             case AUTH_SERVICE_ACCOUNT:
                 String saFile = saFileText.getText().trim();
                 if (!CommonUtils.isEmpty(saFile)) {
-                    params.append("saFile=").append(saFile);
+                    params.append("saKeyFile=").append(URLEncoder.encode(saFile, StandardCharsets.UTF_8));
                 }
                 break;
             case AUTH_METADATA:
                 params.append("useMetadata=true");
-                break;
-            case AUTH_ENV:
-                // No params needed, driver uses env vars
                 break;
         }
 
@@ -382,11 +441,28 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             saFileText.setText(saFile);
         }
 
+        // Load monitoring URL
+        String monitoringUrl = connectionInfo.getProviderProperty(PROP_MONITORING_URL);
+        if (!CommonUtils.isEmpty(monitoringUrl)) {
+            monitoringUrlText.setText(monitoringUrl);
+        }
+
         // Load secure setting
         String useSecure = connectionInfo.getProviderProperty(PROP_USE_SECURE);
         useSecureCheckbox.setSelection(CommonUtils.isEmpty(useSecure) || CommonUtils.toBoolean(useSecure));
 
+        // Load SSL certificate
+        String sslCertificate = connectionInfo.getProviderProperty(PROP_SSL_CERTIFICATE);
+        if (!CommonUtils.isEmpty(sslCertificate)) {
+            sslCertificateText.setText(sslCertificate);
+        }
+
+        // Load autocomplete API setting
+        String autocompleteEnabled = connectionInfo.getProviderProperty(PROP_AUTOCOMPLETE_API_ENABLED);
+        autocompleteApiCheckbox.setSelection(CommonUtils.isEmpty(autocompleteEnabled) || CommonUtils.toBoolean(autocompleteEnabled));
+
         updateAuthControls();
+        updateSslCertControls();
         updateUrl();
     }
 
@@ -405,6 +481,7 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         // Clear all auth-related JDBC properties first
         connectionInfo.getProperties().remove("token");
         connectionInfo.getProperties().remove("saFile");
+        connectionInfo.getProperties().remove("saKeyFile");
         connectionInfo.getProperties().remove("useMetadata");
         connectionInfo.getProperties().remove("user");
         connectionInfo.getProperties().remove("password");
@@ -421,21 +498,19 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
                 break;
             case AUTH_TOKEN:
                 String token = tokenText.getText().trim();
-                log.debug("Saving YDB token authentication, token length: " + token.length());
                 connectionInfo.setProviderProperty(PROP_TOKEN, token);
                 connectionInfo.setProperty("token", token);
-                log.debug("Token property set in connectionInfo");
                 break;
             case AUTH_SERVICE_ACCOUNT:
                 String saFile = saFileText.getText().trim();
                 connectionInfo.setProviderProperty(PROP_SA_FILE, saFile);
-                connectionInfo.setProperty("saFile", saFile);
+                connectionInfo.setProperty("saKeyFile", saFile);
                 break;
             case AUTH_METADATA:
                 connectionInfo.setProperty("useMetadata", "true");
                 break;
             default:
-                // Anonymous or env - no additional properties
+                // Anonymous or metadata - no additional user/password
                 connectionInfo.setUserName(null);
                 connectionInfo.setUserPassword(null);
                 break;
@@ -449,8 +524,29 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             connectionInfo.setProviderProperty(PROP_SA_FILE, null);
         }
 
+        // Save monitoring URL
+        String monitoringUrl = monitoringUrlText.getText().trim();
+        if (!CommonUtils.isEmpty(monitoringUrl)) {
+            connectionInfo.setProviderProperty(PROP_MONITORING_URL, monitoringUrl);
+        } else {
+            connectionInfo.setProviderProperty(PROP_MONITORING_URL, null);
+        }
+
         // Save secure setting
         connectionInfo.setProviderProperty(PROP_USE_SECURE, String.valueOf(useSecureCheckbox.getSelection()));
+
+        // Save SSL certificate
+        String sslCertificate = sslCertificateText.getText().trim();
+        if (!CommonUtils.isEmpty(sslCertificate)) {
+            connectionInfo.setProviderProperty(PROP_SSL_CERTIFICATE, sslCertificate);
+            connectionInfo.setProperty("secureConnectionCertificate", sslCertificate);
+        } else {
+            connectionInfo.setProviderProperty(PROP_SSL_CERTIFICATE, null);
+            connectionInfo.getProperties().remove("secureConnectionCertificate");
+        }
+
+        // Save autocomplete API setting
+        connectionInfo.setProviderProperty(PROP_AUTOCOMPLETE_API_ENABLED, String.valueOf(autocompleteApiCheckbox.getSelection()));
 
         // Update URL
         updateUrl();

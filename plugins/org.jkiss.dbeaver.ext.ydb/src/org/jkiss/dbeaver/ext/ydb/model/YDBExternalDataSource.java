@@ -27,7 +27,8 @@ import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.struct.DBSObject;
 
 import tech.ydb.core.grpc.GrpcTransport;
-import tech.ydb.proto.table.YdbTable;
+import tech.ydb.proto.scheme.SchemeOperationProtos;
+import tech.ydb.scheme.SchemeClient;
 import tech.ydb.table.SessionRetryContext;
 
 import java.util.Map;
@@ -35,7 +36,7 @@ import java.util.Map;
 /**
  * YDB External Data Source.
  */
-public class YDBExternalDataSource implements DBSObject, DBPRefreshableObject {
+public class YDBExternalDataSource implements DBSObject, DBPRefreshableObject, YDBPermissionHolder {
 
     private static final Log log = Log.getLog(YDBExternalDataSource.class);
 
@@ -50,6 +51,10 @@ public class YDBExternalDataSource implements DBSObject, DBPRefreshableObject {
     private String authMethod;
     private String tokenSecretPath;
     private String installation;
+    private String owner;
+    private java.util.List<YDBPermissionHolder.PermissionEntry> explicitPermissions = java.util.List.of();
+    private java.util.List<YDBPermissionHolder.PermissionEntry> effectivePermissionsEntries = java.util.List.of();
+    private boolean permissionsLoaded = false;
 
     public YDBExternalDataSource(@NotNull DBSObject parent, @NotNull String fullPath) {
         this.parent = parent;
@@ -116,51 +121,138 @@ public class YDBExternalDataSource implements DBSObject, DBPRefreshableObject {
         return installation;
     }
 
+    @Nullable
+    @Property(viewable = false, order = 100)
+    public String getOwner() {
+        return owner;
+    }
+
+    @NotNull
+    @Override
+    public java.util.List<YDBPermissionHolder.PermissionEntry> getExplicitPermissions() {
+        return explicitPermissions;
+    }
+
+    @NotNull
+    @Override
+    public java.util.List<YDBPermissionHolder.PermissionEntry> getEffectivePermissions() {
+        return effectivePermissionsEntries;
+    }
+
+    @Override
+    public void ensurePermissionsLoaded(@NotNull DBRProgressMonitor monitor) throws DBException {
+        if (permissionsLoaded) {
+            return;
+        }
+        try (org.jkiss.dbeaver.model.exec.jdbc.JDBCSession session =
+                 org.jkiss.dbeaver.model.DBUtils.openMetaSession(monitor, getDataSource(), "Load permissions")) {
+            java.sql.Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(tech.ydb.jdbc.YdbConnection.class)) {
+                tech.ydb.jdbc.YdbConnection ydbConn = conn.unwrap(tech.ydb.jdbc.YdbConnection.class);
+                tech.ydb.jdbc.context.YdbContext ctx = ydbConn.getCtx();
+                loadPermissions(ctx.getSchemeClient(), ctx.getPrefixPath());
+            }
+        } catch (Exception e) {
+            log.debug("Failed to load permissions: " + e.getMessage());
+        }
+    }
+
+    synchronized void loadPermissions(
+        @NotNull SchemeClient schemeClient,
+        @NotNull String prefixPath
+    ) {
+        if (permissionsLoaded) {
+            return;
+        }
+        String absolutePath = prefixPath + "/" + fullPath;
+        SchemeOperationProtos.Entry entry = YDBDescribeHelper.describePath(schemeClient, absolutePath);
+        if (entry != null) {
+            owner = entry.getOwner();
+            explicitPermissions = YDBDescribeHelper.toPermissionEntries(entry.getPermissionsList());
+            effectivePermissionsEntries = YDBDescribeHelper.toPermissionEntries(entry.getEffectivePermissionsList());
+        }
+        permissionsLoaded = true;
+    }
+
+    @Override
+    public void resetPermissions() {
+        permissionsLoaded = false;
+        owner = null;
+        explicitPermissions = new java.util.ArrayList<>();
+        effectivePermissionsEntries = new java.util.ArrayList<>();
+    }
+
+    @Override
+    public void modifyPermissions(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull java.util.List<YDBPermissionHolder.PermissionAction> actions,
+        boolean clearPermissions,
+        @Nullable Boolean interruptInheritance
+    ) throws DBException {
+        try (org.jkiss.dbeaver.model.exec.jdbc.JDBCSession session =
+                 org.jkiss.dbeaver.model.DBUtils.openMetaSession(monitor, getDataSource(), "Modify permissions")) {
+            java.sql.Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(tech.ydb.jdbc.YdbConnection.class)) {
+                tech.ydb.jdbc.YdbConnection ydbConn = conn.unwrap(tech.ydb.jdbc.YdbConnection.class);
+                tech.ydb.jdbc.context.YdbContext ctx = ydbConn.getCtx();
+                String absolutePath = ctx.getPrefixPath() + "/" + fullPath;
+                boolean ok = YDBDescribeHelper.modifyPermissions(
+                    ctx.getGrpcTransport(), absolutePath, actions, clearPermissions, interruptInheritance);
+                if (!ok) {
+                    throw new DBException("Failed to modify permissions on " + absolutePath);
+                }
+                resetPermissions();
+            }
+        } catch (java.sql.SQLException e) {
+            throw new DBException("Failed to modify permissions", e);
+        }
+    }
+
     synchronized void loadProperties(
         @NotNull GrpcTransport transport,
         @NotNull SessionRetryContext retryCtx,
-        @NotNull String prefixPath
+        @NotNull String prefixPath,
+        @Nullable SchemeClient schemeClient
     ) {
         if (propertiesLoaded) {
             return;
         }
         String absolutePath = prefixPath + "/" + fullPath;
-        YdbTable.DescribeTableResult result = YDBDescribeHelper.describeTable(
-            transport, retryCtx, absolutePath);
-        if (result != null) {
-            parseAttributes(result.getAttributesMap());
+        YDBDescribeHelper.ExternalDataSourceInfo info =
+            YDBDescribeHelper.describeExternalDataSource(transport, absolutePath);
+        if (info != null) {
+            sourceType = info.sourceType;
+            location = info.location;
+            owner = info.owner;
+            explicitPermissions = info.permissions;
+            effectivePermissionsEntries = info.effectivePermissions;
+            permissionsLoaded = true;
+
+            // Additional properties from the map
+            Map<String, String> props = info.properties;
+            databaseName = getPropertyIgnoreCase(props, "DATABASE_NAME");
+            authMethod = getPropertyIgnoreCase(props, "AUTH_METHOD");
+            tokenSecretPath = getPropertyIgnoreCase(props, "TOKEN_SECRET_PATH");
+            if (tokenSecretPath == null) {
+                tokenSecretPath = getPropertyIgnoreCase(props, "TOKEN_SECRET_NAME");
+            }
+            installation = getPropertyIgnoreCase(props, "INSTALLATION");
+
+            log.debug("External data source: sourceType=" + sourceType
+                + ", location=" + location + ", properties=" + props);
+        } else if (schemeClient != null && !permissionsLoaded) {
+            loadPermissions(schemeClient, prefixPath);
         }
         propertiesLoaded = true;
     }
 
-    private void parseAttributes(@NotNull Map<String, String> attributes) {
-        sourceType = attributes.get("SOURCE_TYPE");
-        location = attributes.get("LOCATION");
-        databaseName = attributes.get("DATABASE_NAME");
-        authMethod = attributes.get("AUTH_METHOD");
-        tokenSecretPath = attributes.get("TOKEN_SECRET_NAME");
-        installation = attributes.get("INSTALLATION");
-
-        if (sourceType == null) {
-            sourceType = attributes.get("source_type");
+    @Nullable
+    private static String getPropertyIgnoreCase(@NotNull Map<String, String> props, @NotNull String key) {
+        String value = props.get(key);
+        if (value == null) {
+            value = props.get(key.toLowerCase(java.util.Locale.ROOT));
         }
-        if (location == null) {
-            location = attributes.get("location");
-        }
-        if (databaseName == null) {
-            databaseName = attributes.get("database_name");
-        }
-        if (authMethod == null) {
-            authMethod = attributes.get("auth_method");
-        }
-        if (tokenSecretPath == null) {
-            tokenSecretPath = attributes.get("token_secret_name");
-        }
-        if (installation == null) {
-            installation = attributes.get("installation");
-        }
-
-        log.debug("External data source attributes: " + attributes);
+        return value;
     }
 
     @Nullable
@@ -188,12 +280,16 @@ public class YDBExternalDataSource implements DBSObject, DBPRefreshableObject {
     @Override
     public DBSObject refreshObject(@NotNull DBRProgressMonitor monitor) throws DBException {
         propertiesLoaded = false;
+        permissionsLoaded = false;
         sourceType = null;
         location = null;
         databaseName = null;
         authMethod = null;
         tokenSecretPath = null;
         installation = null;
+        owner = null;
+        explicitPermissions = java.util.List.of();
+        effectivePermissionsEntries = java.util.List.of();
         return this;
     }
 

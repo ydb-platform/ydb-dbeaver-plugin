@@ -69,6 +69,15 @@ public class YDBCatalog extends GenericCatalog {
         if ("Tables".equalsIgnoreCase(childName)) {
             return getTablesFolder(monitor);
         }
+        // Try standard JDBC cache first
+        DBSObject result = super.getChild(monitor, childName);
+        if (result != null) {
+            return result;
+        }
+        // Fallback: delegate to DataSource hierarchy (uses SchemeClient, skips .tmp)
+        if (getDataSource() instanceof YDBDataSource ydbDs) {
+            return ydbDs.getChild(monitor, childName);
+        }
         return null;
     }
 

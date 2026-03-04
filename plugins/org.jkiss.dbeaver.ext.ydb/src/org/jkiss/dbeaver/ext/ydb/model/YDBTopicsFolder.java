@@ -131,13 +131,16 @@ public class YDBTopicsFolder implements DBSFolder, DBPRefreshableObject {
 
             List<YDBTopic> allTopics = new ArrayList<>();
 
+            SchemeClient schemeClient = null;
+            String prefixPath = null;
+
             try (JDBCSession session = DBUtils.openMetaSession(monitor, dataSource, "Load topics")) {
                 Connection conn = session.getOriginal();
                 if (conn.isWrapperFor(YdbConnection.class)) {
                     YdbConnection ydbConn = conn.unwrap(YdbConnection.class);
                     YdbContext ctx = ydbConn.getCtx();
-                    SchemeClient schemeClient = ctx.getSchemeClient();
-                    String prefixPath = ctx.getPrefixPath();
+                    schemeClient = ctx.getSchemeClient();
+                    prefixPath = ctx.getPrefixPath();
 
                     scanForTopics(schemeClient, prefixPath, "", allTopics);
                 }
@@ -146,6 +149,10 @@ public class YDBTopicsFolder implements DBSFolder, DBPRefreshableObject {
             }
 
             buildHierarchy(allTopics);
+
+            if (schemeClient != null) {
+                loadAllPermissions(schemeClient, prefixPath);
+            }
             topicsLoaded = true;
         } finally {
             monitor.done();
@@ -172,7 +179,8 @@ public class YDBTopicsFolder implements DBSFolder, DBPRefreshableObject {
                     || type == SchemeOperationProtos.Entry.Type.TOPIC) {
                 result.add(new YDBTopic(dataSource, entryPath));
                 log.debug("Found topic: " + entryPath);
-            } else if (type == SchemeOperationProtos.Entry.Type.DIRECTORY) {
+            } else if (type == SchemeOperationProtos.Entry.Type.DIRECTORY
+                    && !entry.getName().startsWith(".")) {
                 scanForTopics(schemeClient, basePath, entryPath, result);
             }
         }
@@ -194,7 +202,7 @@ public class YDBTopicsFolder implements DBSFolder, DBPRefreshableObject {
                     if (currentFolder == null) {
                         currentFolder = rootFolders.computeIfAbsent(
                             folderName,
-                            n -> new YDBTopicFolder(this, null, n)
+                            n -> new YDBTopicFolder(dataSource, null, n)
                         );
                     } else {
                         currentFolder = currentFolder.getOrCreateSubFolder(folderName);
@@ -202,7 +210,7 @@ public class YDBTopicsFolder implements DBSFolder, DBPRefreshableObject {
                 }
 
                 String shortName = parts[parts.length - 1];
-                DBSObject parent = currentFolder != null ? currentFolder : this;
+                DBSObject parent = currentFolder != null ? currentFolder : dataSource;
                 YDBTopic leafTopic = new YDBTopic(parent, shortName, relativePath);
 
                 if (currentFolder != null) {
@@ -211,11 +219,40 @@ public class YDBTopicsFolder implements DBSFolder, DBPRefreshableObject {
                     rootTopics.add(leafTopic);
                 }
             } else {
-                rootTopics.add(new YDBTopic(this, relativePath, relativePath));
+                rootTopics.add(new YDBTopic(dataSource, relativePath, relativePath));
             }
         }
 
         rootTopics.sort(Comparator.comparing(YDBTopic::getName, String.CASE_INSENSITIVE_ORDER));
+    }
+
+    private void loadAllPermissions(
+        @NotNull SchemeClient schemeClient,
+        @NotNull String prefixPath
+    ) {
+        if (rootTopics != null) {
+            for (YDBTopic topic : rootTopics) {
+                topic.loadPermissions(schemeClient, prefixPath);
+            }
+        }
+        if (rootFolders != null) {
+            for (YDBTopicFolder folder : rootFolders.values()) {
+                loadFolderPermissions(folder, schemeClient, prefixPath);
+            }
+        }
+    }
+
+    private void loadFolderPermissions(
+        @NotNull YDBTopicFolder folder,
+        @NotNull SchemeClient schemeClient,
+        @NotNull String prefixPath
+    ) {
+        for (YDBTopic topic : folder.getTopics()) {
+            topic.loadPermissions(schemeClient, prefixPath);
+        }
+        for (YDBTopicFolder sub : folder.getSubFolders()) {
+            loadFolderPermissions(sub, schemeClient, prefixPath);
+        }
     }
 
     @Override

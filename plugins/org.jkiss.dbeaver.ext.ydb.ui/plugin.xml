@@ -15,7 +15,7 @@
         <view
             id="org.jkiss.dbeaver.ext.ydb.dataSourceEditorView"
             dataSource="ydb"
-            targetID="org.jkiss.dbeaver.ext.ui.connectionEditor"
+            targetID="org.jkiss.dbeaver.ext.ui.editConnectionDialog"
             label="%dialog.connection.header"
             class="org.jkiss.dbeaver.ext.ydb.ui.YDBConnectionPage"
             icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png">
@@ -33,6 +33,28 @@
         </editorContribution>
     </extension>
 
+    <!-- Database Load Dashboard Editor -->
+    <extension point="org.jkiss.dbeaver.dataSourceProvider">
+        <editorContribution
+            editorId="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBDatabaseLoadEditor"
+            category="connectionEditor"
+            label="%editor.database_load.name"
+            icon="platform:/plugin/org.jkiss.dbeaver.model/icons/tree/info.svg">
+            <supports dataSource="ydb"/>
+        </editorContribution>
+    </extension>
+
+    <!-- Convert Dialect Editor -->
+    <extension point="org.jkiss.dbeaver.dataSourceProvider">
+        <editorContribution
+            editorId="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBConvertDialectEditor"
+            category="connectionEditor"
+            label="%editor.convert.dialect.name"
+            icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/convert.svg">
+            <supports dataSource="ydb"/>
+        </editorContribution>
+    </extension>
+
     <extension point="org.eclipse.ui.editors">
         <editor
             name="%editor.session_manager.name"
@@ -41,14 +63,68 @@
             id="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBSessionEditor"
             contributorClass="org.jkiss.dbeaver.ui.editors.EditorSearchActionsContributor">
         </editor>
+        <editor
+            name="%editor.database_load.name"
+            icon="platform:/plugin/org.jkiss.dbeaver.model/icons/tree/info.svg"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBDatabaseLoadEditor"
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBDatabaseLoadEditor"
+            contributorClass="org.jkiss.dbeaver.ui.editors.EditorSearchActionsContributor">
+        </editor>
+        <editor
+            name="%editor.convert.dialect.name"
+            icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/convert.svg"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBConvertDialectEditor"
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBConvertDialectEditor"
+            contributorClass="org.jkiss.dbeaver.ui.editors.EditorSearchActionsContributor">
+        </editor>
     </extension>
 
     <!-- Alter Streaming Query command -->
     <extension point="org.eclipse.ui.commands">
         <category id="org.jkiss.dbeaver.ext.ydb" name="YDB" description="YDB Commands"/>
-        <command id="org.jkiss.dbeaver.ext.ydb.external.datasource.create"
-                 name="%command.external_datasource.create.name"
-                 description="%command.external_datasource.create.description"
+        <command id="org.jkiss.dbeaver.ext.ydb.external.datasource.create.object_storage"
+                 name="%command.external_datasource.create.object_storage.name"
+                 description="%command.external_datasource.create.object_storage.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.external.datasource.create.ydb"
+                 name="%command.external_datasource.create.ydb.name"
+                 description="%command.external_datasource.create.ydb.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.table.row.create"
+                 name="%command.table.row.create.name"
+                 description="%command.table.row.create.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.table.column.create"
+                 name="%command.table.column.create.name"
+                 description="%command.table.column.create.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.topic.create"
+                 name="%command.topic.create.name"
+                 description="%command.topic.create.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.view.create"
+                 name="%command.view.create.name"
+                 description="%command.view.create.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.external.table.create.csv"
+                 name="%command.external_table.create.csv.name"
+                 description="%command.external_table.create.csv.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.external.table.create.json"
+                 name="%command.external_table.create.json.name"
+                 description="%command.external_table.create.json.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.external.table.create.parquet"
+                 name="%command.external_table.create.parquet.name"
+                 description="%command.external_table.create.parquet.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.transfer.create"
+                 name="%command.transfer.create.name"
+                 description="%command.transfer.create.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.streaming.query.create"
+                 name="%command.streaming_query.create.name"
+                 description="%command.streaming_query.create.description"
                  categoryId="org.jkiss.dbeaver.ext.ydb"/>
         <command id="org.jkiss.dbeaver.ext.ydb.streaming.query.alter"
                  name="%command.streaming_query.alter.name"
@@ -62,6 +138,14 @@
                  name="%command.streaming_query.start.name"
                  description="%command.streaming_query.start.description"
                  categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.run.statistics"
+                 name="%command.statistics.name"
+                 description="%command.statistics.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
+        <command id="org.jkiss.dbeaver.ext.ydb.run.chart"
+                 name="%command.chart.name"
+                 description="%command.chart.description"
+                 categoryId="org.jkiss.dbeaver.ext.ydb"/>
     </extension>
 
     <extension point="org.eclipse.core.expressions.propertyTesters">
@@ -71,22 +155,193 @@
             namespace="org.jkiss.dbeaver.ext.ydb.streaming.query"
             properties="isRunning"
             type="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQuery"/>
+        <propertyTester
+            id="org.jkiss.dbeaver.ext.ydb.folder.propertyTester"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBFolderPropertyTester"
+            namespace="org.jkiss.dbeaver.ext.ydb.folder"
+            properties="folderId"
+            type="java.lang.Object"/>
     </extension>
 
     <extension point="org.eclipse.ui.handlers">
-        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create"
-                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExternalDataSourceCreateHandler">
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create.object_storage"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExtDsObjectStorageCreateHandler">
             <enabledWhen>
                 <with variable="selection">
                     <count value="1"/>
                     <iterate operator="and">
-                        <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
-                            <or>
-                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourcesFolder"/>
-                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourceFolder"/>
-                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSource"/>
-                            </or>
-                        </adapt>
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalDataSources" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <or>
+                                    <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourceFolder"/>
+                                    <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSource"/>
+                                </or>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create.ydb"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExtDsYdbCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalDataSources" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <or>
+                                    <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourceFolder"/>
+                                    <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSource"/>
+                                </or>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.table.row.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBRowTableCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbTables" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBTableFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.table.column.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBColumnTableCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbTables" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBTableFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.topic.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBTopicCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbTopics" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBTopicFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.view.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBViewCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbViews" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBViewFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.csv"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExtTableCsvCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalTables" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalTableFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.json"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExtTableJsonCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalTables" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalTableFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.parquet"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBExtTableParquetCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalTables" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalTableFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.transfer.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBTransferCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbTransfers" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBTransferFolder"/>
+                            </adapt>
+                        </or>
+                    </iterate>
+                </with>
+            </enabledWhen>
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.create"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryCreateHandler">
+            <enabledWhen>
+                <with variable="selection">
+                    <count value="1"/>
+                    <iterate operator="and">
+                        <or>
+                            <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbStreamingQueries" forcePluginActivation="true"/>
+                            <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBStreamingQueryFolder"/>
+                            </adapt>
+                        </or>
                     </iterate>
                 </with>
             </enabledWhen>
@@ -136,11 +391,139 @@
                 </with>
             </enabledWhen>
         </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.run.statistics"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStatisticsHandler">
+        </handler>
+        <handler commandId="org.jkiss.dbeaver.ext.ydb.run.chart"
+                 class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBChartHandler">
+        </handler>
+    </extension>
+
+    <extension point="org.eclipse.ui.commandImages">
+        <image commandId="org.jkiss.dbeaver.ext.ydb.table.row.create"
+               icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/table_row.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.table.column.create"
+               icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/table_column.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.topic.create"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.view.create"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create.object_storage"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create.ydb"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.csv"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.json"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.parquet"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.transfer.create"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
+        <image commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.create"
+               icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg"/>
     </extension>
 
     <extension point="org.eclipse.ui.menus">
-        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=navigator_additions_end">
-            <command commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create">
+        <!-- External Data Sources: sub-menu "Create new" with ObjectStorage and YDB -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <menu id="org.jkiss.dbeaver.ext.ydb.external.datasource.create.menu" label="%command.external_datasource.create.menu.label" icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg">
+                <command commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create.object_storage">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <command commandId="org.jkiss.dbeaver.ext.ydb.external.datasource.create.ydb">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <visibleWhen>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate operator="and">
+                            <or>
+                                <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalDataSources" forcePluginActivation="true"/>
+                                <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                    <or>
+                                        <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourceFolder"/>
+                                        <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSource"/>
+                                    </or>
+                                </adapt>
+                            </or>
+                        </iterate>
+                    </with>
+                </visibleWhen>
+            </menu>
+        </menuContribution>
+        <!-- Tables: sub-menu "Create new" with Row-based and Column-based -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <menu id="org.jkiss.dbeaver.ext.ydb.table.create.menu" label="%command.table.create.menu.label" icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg">
+                <command commandId="org.jkiss.dbeaver.ext.ydb.table.row.create">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <command commandId="org.jkiss.dbeaver.ext.ydb.table.column.create">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <visibleWhen>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate operator="and">
+                            <or>
+                                <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbTables" forcePluginActivation="true"/>
+                                <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                    <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBTableFolder"/>
+                                </adapt>
+                            </or>
+                        </iterate>
+                    </with>
+                </visibleWhen>
+            </menu>
+        </menuContribution>
+        <!-- Topics -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.topic.create">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <!-- Views -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.view.create">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <!-- External Tables: sub-menu "Create new" with CSV, JSON, Parquet -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <menu id="org.jkiss.dbeaver.ext.ydb.external.table.create.menu" label="%command.external_table.create.menu.label" icon="platform:/plugin/org.jkiss.dbeaver.ui/icons/create.svg">
+                <command commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.csv">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <command commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.json">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <command commandId="org.jkiss.dbeaver.ext.ydb.external.table.create.parquet">
+                    <visibleWhen checkEnabled="true"/>
+                </command>
+                <visibleWhen>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate operator="and">
+                            <or>
+                                <test property="org.jkiss.dbeaver.ext.ydb.folder.folderId" value="ydbExternalTables" forcePluginActivation="true"/>
+                                <adapt type="org.jkiss.dbeaver.model.struct.DBSObject">
+                                    <instanceof value="org.jkiss.dbeaver.ext.ydb.model.YDBExternalTableFolder"/>
+                                </adapt>
+                            </or>
+                        </iterate>
+                    </with>
+                </visibleWhen>
+            </menu>
+        </menuContribution>
+        <!-- Transfers -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.transfer.create">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <!-- Streaming Queries -->
+        <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=create">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.streaming.query.create">
                 <visibleWhen checkEnabled="true"/>
             </command>
         </menuContribution>
@@ -159,6 +542,143 @@
                 <visibleWhen checkEnabled="true"/>
             </command>
         </menuContribution>
+        <!-- Statistics button in SQL editor toolbar (YDB only) -->
+        <menuContribution allPopups="false" locationURI="toolbar:org.jkiss.dbeaver.ui.editors.sql.toolbar.side.top">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.run.statistics"
+                     label="%command.statistics.name"
+                     icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/statistics.svg"
+                     tooltip="%command.statistics.description"
+                     style="push">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+        <!-- Chart button in SQL editor toolbar (YDB only) -->
+        <menuContribution allPopups="false" locationURI="toolbar:org.jkiss.dbeaver.ui.editors.sql.toolbar.side.top">
+            <command commandId="org.jkiss.dbeaver.ext.ydb.run.chart"
+                     label="%command.chart.name"
+                     icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/chart.svg"
+                     tooltip="%command.chart.description"
+                     style="push">
+                <visibleWhen checkEnabled="true"/>
+            </command>
+        </menuContribution>
+    </extension>
+
+    <!-- YDB Graphical Plan Viewer for EXPLAIN -->
+    <extension point="org.jkiss.dbeaver.sql.plan.view">
+        <view id="ydb-diagram"
+              priority="50"
+              label="%sql.plan.view.diagram.name"
+              icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png"
+              description="%sql.plan.view.diagram.tip"
+              class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBSQLPlanViewProvider">
+            <datasource id="ydb"/>
+        </view>
+        <view id="ydb-statistics-svg"
+              priority="40"
+              label="%sql.plan.view.statistics.name"
+              icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png"
+              description="%sql.plan.view.statistics.tip"
+              class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStatisticsSvgViewProvider">
+            <datasource id="ydb"/>
+        </view>
+    </extension>
+
+    <!-- YDB Dashboard Charts -->
+    <extension point="org.jkiss.dbeaver.dashboard.ui">
+        <dashboardView id="ydb-viewer" label="YDB Viewer"
+            icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/ydb_icon.png"
+            dataTypes="provided"
+            renderer="org.jkiss.dbeaver.ext.ydb.ui.dashboard.YDBDashboardRenderer"
+            configurationEditor="org.jkiss.dbeaver.ext.ydb.ui.dashboard.YDBDashboardConfigEditor"
+            viewSettingsEditor="org.jkiss.dbeaver.ext.ydb.ui.dashboard.YDBDashboardViewSettingsEditor"/>
+    </extension>
+
+    <extension point="org.jkiss.dbeaver.dashboard">
+        <dashboard id="ydb.cpu" label="CPU Load" defaultView="ydb-viewer"
+            group="Database Load" showByDefault="true" value="percent" measure="%"
+            updatePeriod="5000" description="YDB cluster CPU usage">
+            <datasource id="ydb"/>
+        </dashboard>
+        <dashboard id="ydb.storage" label="Storage" defaultView="ydb-viewer"
+            group="Database Load" showByDefault="true" value="bytes"
+            updatePeriod="5000" description="YDB cluster storage usage">
+            <datasource id="ydb"/>
+        </dashboard>
+        <dashboard id="ydb.memory" label="Memory" defaultView="ydb-viewer"
+            group="Database Load" showByDefault="true" value="bytes"
+            updatePeriod="5000" description="YDB cluster memory usage">
+            <datasource id="ydb"/>
+        </dashboard>
+        <dashboard id="ydb.network" label="Network" defaultView="ydb-viewer"
+            group="Database Load" showByDefault="true" value="bytes" measure="KB/s"
+            updatePeriod="5000" description="YDB network write throughput">
+            <datasource id="ydb"/>
+        </dashboard>
+        <dashboard id="ydb.queries" label="Running Queries" defaultView="ydb-viewer"
+            group="Database Load" showByDefault="true" value="integer"
+            updatePeriod="5000" description="Number of concurrently running queries">
+            <datasource id="ydb"/>
+        </dashboard>
+    </extension>
+
+    <!-- View DDL Editor -->
+    <extension point="org.jkiss.dbeaver.databaseEditor">
+        <editor
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.viewSource"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBViewSourceEditor"
+            label="%editor.view.source.name"
+            description="%editor.view.source.description"
+            position="additions_start"
+            type="folder"
+            icon="#sql_text"
+            contributor="org.jkiss.dbeaver.ui.editors.sql.SQLEditorContributorNested"
+            embeddable="false">
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBView"/>
+        </editor>
+    </extension>
+
+    <!-- Transfer DDL Editor -->
+    <extension point="org.jkiss.dbeaver.databaseEditor">
+        <editor
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.transferSource"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBTransferSourceEditor"
+            label="%editor.transfer.source.name"
+            description="%editor.transfer.source.description"
+            position="additions_start"
+            type="folder"
+            icon="#sql_text"
+            contributor="org.jkiss.dbeaver.ui.editors.sql.SQLEditorContributorNested"
+            embeddable="false">
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTransfer"/>
+        </editor>
+    </extension>
+
+    <!-- Rights Editor for YDB objects -->
+    <extension point="org.jkiss.dbeaver.databaseEditor">
+        <editor
+            id="org.jkiss.dbeaver.ext.ydb.ui.editors.rights"
+            class="org.jkiss.dbeaver.ext.ydb.ui.editors.YDBRightsEditor"
+            label="Rights"
+            description="Object access rights"
+            position="additions_middle"
+            type="folder"
+            icon="#permissions">
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTable"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBView"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTopic"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBExternalTable"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSource"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBResourcePool"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBSystemView"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTableFolder"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBViewFolder"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTopicFolder"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBExternalDataSourceFolder"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBExternalTableFolder"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTransfer"/>
+            <objectType name="org.jkiss.dbeaver.ext.ydb.model.YDBTransferFolder"/>
+        </editor>
     </extension>
 
     <!-- Streaming Query Editors -->

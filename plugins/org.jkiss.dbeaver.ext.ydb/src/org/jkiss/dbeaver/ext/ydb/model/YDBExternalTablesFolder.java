@@ -145,7 +145,7 @@ public class YDBExternalTablesFolder implements DBSFolder, DBPRefreshableObject 
 
                     GrpcTransport transport = ctx.getGrpcTransport();
                     SessionRetryContext retryCtx = ctx.getRetryCtx();
-                    loadAllProperties(transport, retryCtx, prefixPath);
+                    loadAllProperties(transport, retryCtx, prefixPath, schemeClient);
                 }
             } catch (SQLException e) {
                 log.debug("Failed to load external tables via SchemeClient: " + e.getMessage());
@@ -160,13 +160,14 @@ public class YDBExternalTablesFolder implements DBSFolder, DBPRefreshableObject 
     private void loadAllProperties(
         @NotNull GrpcTransport transport,
         @NotNull SessionRetryContext retryCtx,
-        @NotNull String prefixPath
+        @NotNull String prefixPath,
+        @NotNull SchemeClient schemeClient
     ) {
         for (YDBExternalTable entry : rootEntries) {
-            entry.loadProperties(transport, retryCtx, prefixPath);
+            entry.loadProperties(transport, retryCtx, prefixPath, schemeClient);
         }
         for (YDBExternalTableFolder folder : rootFolders.values()) {
-            loadFolderProperties(folder, transport, retryCtx, prefixPath);
+            loadFolderProperties(folder, transport, retryCtx, prefixPath, schemeClient);
         }
     }
 
@@ -174,13 +175,14 @@ public class YDBExternalTablesFolder implements DBSFolder, DBPRefreshableObject 
         @NotNull YDBExternalTableFolder folder,
         @NotNull GrpcTransport transport,
         @NotNull SessionRetryContext retryCtx,
-        @NotNull String prefixPath
+        @NotNull String prefixPath,
+        @NotNull SchemeClient schemeClient
     ) {
         for (YDBExternalTable entry : folder.getExternalTables()) {
-            entry.loadProperties(transport, retryCtx, prefixPath);
+            entry.loadProperties(transport, retryCtx, prefixPath, schemeClient);
         }
         for (YDBExternalTableFolder sub : folder.getSubFolders()) {
-            loadFolderProperties(sub, transport, retryCtx, prefixPath);
+            loadFolderProperties(sub, transport, retryCtx, prefixPath, schemeClient);
         }
     }
 
@@ -204,7 +206,8 @@ public class YDBExternalTablesFolder implements DBSFolder, DBPRefreshableObject 
                 String shortName = entry.getName();
                 result.add(new YDBExternalTable(dataSource, shortName, entryPath));
                 log.debug("Found external table: " + entryPath);
-            } else if (type == SchemeOperationProtos.Entry.Type.DIRECTORY) {
+            } else if (type == SchemeOperationProtos.Entry.Type.DIRECTORY
+                    && !entry.getName().startsWith(".")) {
                 scanEntries(schemeClient, basePath, entryPath, result);
             }
         }

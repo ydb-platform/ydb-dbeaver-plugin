@@ -1,2 +1,32 @@
+# Build output
+target/
+*.class
+
 # Downloaded SDK jars
 plugins/org.jkiss.dbeaver.ext.ydb/lib/
+
+# IDE files
+.idea/
+*.iml
+.eclipse/
+.settings/
+.classpath
+.project
+
+# Python virtual environment
+venv/
+
+# AI assistant instructions and working files
+CLAUDE.md
+.amazonq/
+.gemini/
+plugin.xml
+
+# Internal development notes
+gemini-prep.md
+openspec/
+TODO.md
+pg-ydb-diff.md
+
+# Local helper scripts
+*.sh

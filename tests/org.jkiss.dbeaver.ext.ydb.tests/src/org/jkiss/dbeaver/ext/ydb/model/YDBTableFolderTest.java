@@ -19,6 +19,7 @@ package org.jkiss.dbeaver.ext.ydb.model;
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.struct.DBSObject;
+import org.jkiss.dbeaver.model.struct.DBSObjectContainer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -161,5 +162,61 @@ public class YDBTableFolderTest {
     public void testToString() {
         YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "myFolder");
         assertEquals("myFolder", folder.toString());
+    }
+
+    @Test
+    public void testImplementsDBSObjectContainer() {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        assertTrue("YDBTableFolder should implement DBSObjectContainer",
+            folder instanceof DBSObjectContainer);
+    }
+
+    @Test
+    public void testGetChildReturnsSubFolder() throws DBException {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        folder.getOrCreateSubFolder("sub");
+        DBSObject child = folder.getChild(null, "sub");
+        assertNotNull(child);
+        assertEquals("sub", child.getName());
+        assertTrue(child instanceof YDBTableFolder);
+    }
+
+    @Test
+    public void testGetChildReturnsNullForMissing() throws DBException {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        assertNull(folder.getChild(null, "nonexistent"));
+    }
+
+    @Test
+    public void testGetChildCaseInsensitiveForSubFolders() throws DBException {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        folder.getOrCreateSubFolder("MyFolder");
+        DBSObject child = folder.getChild(null, "myfolder");
+        assertNotNull("getChild should be case-insensitive for subfolders", child);
+        assertEquals("MyFolder", child.getName());
+    }
+
+    @Test
+    public void testGetChildStripsTrailingDot() throws DBException {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        folder.getOrCreateSubFolder("sub");
+        DBSObject child = folder.getChild(null, "sub.");
+        assertNotNull("getChild should find subfolder when name has trailing dot", child);
+        assertEquals("sub", child.getName());
+    }
+
+    @Test
+    public void testGetChildrenReturnsBothSubfoldersAndTables() throws DBException {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        folder.getOrCreateSubFolder("sub1");
+        folder.getOrCreateSubFolder("sub2");
+        Collection<? extends DBSObject> children = folder.getChildren(null);
+        assertEquals(2, children.size());
+    }
+
+    @Test
+    public void testGetPrimaryChildType() throws DBException {
+        YDBTableFolder folder = new YDBTableFolder(mockOwner, null, "root");
+        assertEquals(YDBTable.class, folder.getPrimaryChildType(null));
     }
 }

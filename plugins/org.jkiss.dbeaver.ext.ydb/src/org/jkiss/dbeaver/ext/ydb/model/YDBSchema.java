@@ -19,6 +19,7 @@ package org.jkiss.dbeaver.ext.ydb.model;
 import org.jkiss.code.NotNull;
 import org.jkiss.code.Nullable;
 import org.jkiss.dbeaver.DBException;
+import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.ext.generic.model.GenericCatalog;
 import org.jkiss.dbeaver.ext.generic.model.GenericDataSource;
 import org.jkiss.dbeaver.ext.generic.model.GenericSchema;
@@ -36,6 +37,7 @@ import java.util.List;
  */
 public class YDBSchema extends GenericSchema {
 
+    private static final Log log = Log.getLog(YDBSchema.class);
     private YDBSchemaTablesFolder tablesFolder;
 
     public YDBSchema(
@@ -74,6 +76,15 @@ public class YDBSchema extends GenericSchema {
     public DBSObject getChild(@NotNull DBRProgressMonitor monitor, @NotNull String childName) throws DBException {
         if ("Tables".equalsIgnoreCase(childName)) {
             return getTablesFolder(monitor);
+        }
+        // Try standard JDBC cache first
+        DBSObject result = super.getChild(monitor, childName);
+        if (result != null) {
+            return result;
+        }
+        // Fallback: delegate to DataSource hierarchy (uses SchemeClient, skips .tmp)
+        if (getDataSource() instanceof YDBDataSource ydbDs) {
+            return ydbDs.getChild(monitor, childName);
         }
         return null;
     }

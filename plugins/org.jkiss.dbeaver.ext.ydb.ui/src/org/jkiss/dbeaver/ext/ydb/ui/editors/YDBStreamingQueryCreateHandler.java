@@ -25,14 +25,15 @@ import org.jkiss.dbeaver.runtime.DBWorkbench;
 import org.jkiss.dbeaver.runtime.ui.UIServiceSQL;
 import org.jkiss.dbeaver.ui.navigator.NavigatorUtils;
 
-public class YDBExternalDataSourceCreateHandler extends AbstractHandler {
+public class YDBStreamingQueryCreateHandler extends AbstractHandler {
 
     private static final String SQL_TEMPLATE =
-        "CREATE EXTERNAL DATA SOURCE `<DataSourceName>` WITH (\n" +
-        "  SOURCE_TYPE=\"\",\n" +
-        "  LOCATION=\"\",\n" +
-        "  AUTH_METHOD=\"\"\n" +
-        ");";
+        "CREATE STREAMING QUERY `<query_name>` WITH (\n" +
+        "    RUN = TRUE\n" +
+        ") AS\n" +
+        "DO BEGIN\n" +
+        "    -- query statements here\n" +
+        "END DO";
 
     @Override
     public Object execute(ExecutionEvent event) throws ExecutionException {
@@ -48,7 +49,7 @@ public class YDBExternalDataSourceCreateHandler extends AbstractHandler {
                 object.getDataSource().getContainer(),
                 null,
                 object,
-                "Create External Data Source",
+                "Create Streaming Query",
                 SQL_TEMPLATE
             );
         }

@@ -38,14 +38,17 @@ import java.util.List;
 
 /**
  * Container for YDB resource pools.
- * Resource pools are used for workload management in YDB.
- * Data is loaded from .sys/resource_pools system view.
+ * Pool list and configuration are loaded from .sys/resource_pools system view.
+ * Permissions are loaded lazily via SchemeClient.
  */
 public class YDBResourcePoolsFolder implements DBSFolder, DBPRefreshableObject {
 
     private static final Log log = Log.getLog(YDBResourcePoolsFolder.class);
 
-    private static final String RESOURCE_POOLS_QUERY = "SELECT * FROM `.sys/resource_pools`";
+    private static final String RESOURCE_POOLS_QUERY =
+        "SELECT Name, ConcurrentQueryLimit, QueueSize, DatabaseLoadCpuThreshold, " +
+        "ResourceWeight, TotalCpuLimitPercentPerNode, QueryCpuLimitPercentPerNode, " +
+        "QueryMemoryLimitPercentPerNode FROM `.sys/resource_pools`";
 
     private final YDBDataSource dataSource;
     private List<YDBResourcePool> resourcePools;
@@ -85,22 +88,15 @@ public class YDBResourcePoolsFolder implements DBSFolder, DBPRefreshableObject {
     @NotNull
     @Override
     public Collection<DBSObject> getChildrenObjects(@NotNull DBRProgressMonitor monitor) throws DBException {
-        List<DBSObject> children = new ArrayList<>();
-        children.addAll(getResourcePools(monitor));
-        return children;
+        return new ArrayList<>(getResourcePools(monitor));
     }
 
-    /**
-     * Load resource pools from .sys/resource_pools system view.
-     */
     @Association
     @NotNull
     public synchronized List<YDBResourcePool> getResourcePools(@NotNull DBRProgressMonitor monitor) throws DBException {
-        log.debug("getResourcePools() called, poolsLoaded=" + poolsLoaded);
         if (!poolsLoaded) {
             loadResourcePools(monitor);
         }
-        log.debug("Returning " + (resourcePools != null ? resourcePools.size() : 0) + " resource pools");
         return resourcePools != null ? resourcePools : List.of();
     }
 
@@ -109,32 +105,47 @@ public class YDBResourcePoolsFolder implements DBSFolder, DBPRefreshableObject {
         try {
             resourcePools = new ArrayList<>();
 
-            // Query resource pools from .sys/resource_pools system view
             try (JDBCSession session = DBUtils.openMetaSession(monitor, dataSource, "Load resource pools")) {
                 try (JDBCPreparedStatement stmt = session.prepareStatement(RESOURCE_POOLS_QUERY)) {
                     try (JDBCResultSet rs = stmt.executeQuery()) {
                         while (rs.next()) {
-                            // The first column should be the pool name
-                            String poolName = rs.getString(1);
-                            if (poolName != null && !poolName.isEmpty()) {
-                                YDBResourcePool pool = new YDBResourcePool(dataSource, poolName);
-                                resourcePools.add(pool);
-                                log.debug("Added resource pool: " + poolName);
+                            String name = rs.getString(1);
+                            if (name == null || name.isEmpty()) {
+                                continue;
                             }
+                            int concurrentQueryLimit = rs.getInt(2);
+                            if (rs.wasNull()) concurrentQueryLimit = -1;
+                            int queueSize = rs.getInt(3);
+                            if (rs.wasNull()) queueSize = -1;
+                            double databaseLoadCpuThreshold = rs.getDouble(4);
+                            if (rs.wasNull()) databaseLoadCpuThreshold = -1;
+                            double resourceWeight = rs.getDouble(5);
+                            if (rs.wasNull()) resourceWeight = -1;
+                            double totalCpuLimitPercentPerNode = rs.getDouble(6);
+                            if (rs.wasNull()) totalCpuLimitPercentPerNode = -1;
+                            double queryCpuLimitPercentPerNode = rs.getDouble(7);
+                            if (rs.wasNull()) queryCpuLimitPercentPerNode = -1;
+                            double queryMemoryLimitPercentPerNode = rs.getDouble(8);
+                            if (rs.wasNull()) queryMemoryLimitPercentPerNode = -1;
+
+                            resourcePools.add(new YDBResourcePool(
+                                dataSource, name,
+                                concurrentQueryLimit, queueSize,
+                                databaseLoadCpuThreshold, resourceWeight,
+                                totalCpuLimitPercentPerNode, queryCpuLimitPercentPerNode,
+                                queryMemoryLimitPercentPerNode
+                            ));
                         }
                     }
                 }
             } catch (SQLException e) {
                 log.debug("Failed to load resource pools: " + e.getMessage());
-                // Resource pools may not be available in all YDB configurations
             } catch (DBCException e) {
                 log.debug("Failed to open session for loading resource pools: " + e.getMessage());
             }
 
-            // Sort pools by name
             resourcePools.sort(Comparator.comparing(YDBResourcePool::getName, String.CASE_INSENSITIVE_ORDER));
             poolsLoaded = true;
-
         } finally {
             monitor.done();
         }

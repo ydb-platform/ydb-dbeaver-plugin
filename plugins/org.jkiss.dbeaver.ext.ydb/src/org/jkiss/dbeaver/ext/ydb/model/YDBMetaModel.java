@@ -26,7 +26,12 @@ import org.jkiss.dbeaver.ext.generic.model.GenericStructContainer;
 import org.jkiss.dbeaver.ext.generic.model.GenericTableBase;
 import org.jkiss.dbeaver.ext.generic.model.GenericView;
 import org.jkiss.dbeaver.ext.generic.model.meta.GenericMetaModel;
+import org.jkiss.dbeaver.ext.ydb.model.data.YDBJSONValueHandler;
+import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
+import org.jkiss.dbeaver.model.data.DBDFormatSettings;
+import org.jkiss.dbeaver.model.data.DBDValueHandler;
+import org.jkiss.dbeaver.model.data.DBDValueHandlerProvider;
 import org.jkiss.dbeaver.model.exec.DBCQueryTransformProvider;
 import org.jkiss.dbeaver.model.exec.DBCQueryTransformType;
 import org.jkiss.dbeaver.model.exec.DBCQueryTransformer;
@@ -40,13 +45,15 @@ import org.jkiss.dbeaver.model.exec.plan.DBCQueryPlanner;
 import org.jkiss.dbeaver.ext.ydb.model.plan.YDBQueryPlanner;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.struct.DBSObject;
+import org.jkiss.dbeaver.model.struct.DBSTypedObject;
 
 import java.sql.SQLException;
+import java.util.Map;
 
 /**
  * YDBMetaModel
  */
-public class YDBMetaModel extends GenericMetaModel implements DBCQueryTransformProvider {
+public class YDBMetaModel extends GenericMetaModel implements DBCQueryTransformProvider, DBDValueHandlerProvider {
 
     public YDBMetaModel() {
         super();
@@ -137,10 +144,35 @@ public class YDBMetaModel extends GenericMetaModel implements DBCQueryTransformP
         return super.prepareTableColumnLoadStatement(session, container, table);
     }
 
+    @Override
+    public String getTableDDL(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull GenericTableBase sourceObject,
+        @NotNull Map<String, Object> options
+    ) throws DBException {
+        if (sourceObject instanceof YDBTable) {
+            return ((YDBTable) sourceObject).getObjectDefinitionText(monitor, options);
+        }
+        return super.getTableDDL(monitor, sourceObject, options);
+    }
+
     @Nullable
     @Override
     public DBCQueryPlanner getQueryPlanner(@NotNull GenericDataSource dataSource) {
         return new YDBQueryPlanner(dataSource);
+    }
+
+    @Nullable
+    @Override
+    public DBDValueHandler getValueHandler(DBPDataSource dataSource, DBDFormatSettings preferences, DBSTypedObject typedObject) {
+        String typeName = typedObject.getTypeName();
+        if (typeName != null) {
+            String upperName = typeName.toUpperCase();
+            if (upperName.equals("JSON") || upperName.equals("JSONDOCUMENT")) {
+                return YDBJSONValueHandler.INSTANCE;
+            }
+        }
+        return null;
     }
 
     @Nullable

@@ -19,12 +19,19 @@ package org.jkiss.dbeaver.ext.ydb.model;
 import org.jkiss.code.NotNull;
 import org.jkiss.code.Nullable;
 import org.jkiss.dbeaver.DBException;
+import org.jkiss.dbeaver.Log;
 import org.jkiss.dbeaver.ext.generic.model.GenericStructContainer;
 import org.jkiss.dbeaver.ext.generic.model.GenericTableColumn;
 import org.jkiss.dbeaver.ext.generic.model.GenericView;
 import org.jkiss.dbeaver.model.DBPEvaluationContext;
+import org.jkiss.dbeaver.model.DBUtils;
 import org.jkiss.dbeaver.model.exec.jdbc.JDBCResultSet;
+import org.jkiss.dbeaver.model.exec.jdbc.JDBCSession;
+import org.jkiss.dbeaver.model.meta.Property;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
+
+import tech.ydb.proto.scheme.SchemeOperationProtos;
+import tech.ydb.scheme.SchemeClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,11 +41,17 @@ import java.util.List;
  * System views are read-only and cannot be modified.
  * Column structure is loaded dynamically by executing SELECT * FROM .sys/<view_name> LIMIT 0.
  */
-public class YDBSystemView extends GenericView {
+public class YDBSystemView extends GenericView implements YDBPermissionHolder {
+
+    private static final Log log = Log.getLog(YDBSystemView.class);
 
     private final String fullPath;
     private List<GenericTableColumn> columns;
     private boolean columnsLoaded = false;
+    private String owner;
+    private List<YDBPermissionHolder.PermissionEntry> explicitPermissions = List.of();
+    private List<YDBPermissionHolder.PermissionEntry> effectivePermissionsEntries = List.of();
+    private boolean permissionsLoaded = false;
 
     public YDBSystemView(
         GenericStructContainer container,
@@ -125,26 +138,109 @@ public class YDBSystemView extends GenericView {
         columnsLoaded = true;
     }
 
+    @Nullable
+    @Property(viewable = false, order = 100)
+    public String getOwner() {
+        return owner;
+    }
+
+    @NotNull
+    @Override
+    public List<YDBPermissionHolder.PermissionEntry> getExplicitPermissions() {
+        return explicitPermissions;
+    }
+
+    @NotNull
+    @Override
+    public List<YDBPermissionHolder.PermissionEntry> getEffectivePermissions() {
+        return effectivePermissionsEntries;
+    }
+
+    @Override
+    public void ensurePermissionsLoaded(@NotNull DBRProgressMonitor monitor) throws DBException {
+        if (permissionsLoaded) {
+            return;
+        }
+        try (JDBCSession session = DBUtils.openMetaSession(monitor, getDataSource(), "Load permissions")) {
+            java.sql.Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(tech.ydb.jdbc.YdbConnection.class)) {
+                tech.ydb.jdbc.YdbConnection ydbConn = conn.unwrap(tech.ydb.jdbc.YdbConnection.class);
+                tech.ydb.jdbc.context.YdbContext ctx = ydbConn.getCtx();
+                loadPermissions(ctx.getSchemeClient(), ctx.getPrefixPath());
+            }
+        } catch (Exception e) {
+            log.debug("Failed to load permissions: " + e.getMessage());
+        }
+    }
+
+    synchronized void loadPermissions(
+        @NotNull SchemeClient schemeClient,
+        @NotNull String prefixPath
+    ) {
+        if (permissionsLoaded) {
+            return;
+        }
+        String absolutePath = prefixPath + "/" + fullPath;
+        SchemeOperationProtos.Entry entry = YDBDescribeHelper.describePath(schemeClient, absolutePath);
+        if (entry != null) {
+            owner = entry.getOwner();
+            explicitPermissions = YDBDescribeHelper.toPermissionEntries(entry.getPermissionsList());
+            effectivePermissionsEntries = YDBDescribeHelper.toPermissionEntries(entry.getEffectivePermissionsList());
+        }
+        permissionsLoaded = true;
+    }
+
+    @Override
+    public void resetPermissions() {
+        permissionsLoaded = false;
+        owner = null;
+        explicitPermissions = new java.util.ArrayList<>();
+        effectivePermissionsEntries = new java.util.ArrayList<>();
+    }
+
+    @Override
+    public void modifyPermissions(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull java.util.List<YDBPermissionHolder.PermissionAction> actions,
+        boolean clearPermissions,
+        @Nullable Boolean interruptInheritance
+    ) throws DBException {
+        try (JDBCSession session = DBUtils.openMetaSession(monitor, getDataSource(), "Modify permissions")) {
+            java.sql.Connection conn = session.getOriginal();
+            if (conn.isWrapperFor(tech.ydb.jdbc.YdbConnection.class)) {
+                tech.ydb.jdbc.YdbConnection ydbConn = conn.unwrap(tech.ydb.jdbc.YdbConnection.class);
+                tech.ydb.jdbc.context.YdbContext ctx = ydbConn.getCtx();
+                String absolutePath = ctx.getPrefixPath() + "/" + fullPath;
+                boolean ok = YDBDescribeHelper.modifyPermissions(
+                    ctx.getGrpcTransport(), absolutePath, actions, clearPermissions, interruptInheritance);
+                if (!ok) {
+                    throw new DBException("Failed to modify permissions on " + absolutePath);
+                }
+                resetPermissions();
+            }
+        } catch (java.sql.SQLException e) {
+            throw new DBException("Failed to modify permissions", e);
+        }
+    }
+
     @Override
     public List<? extends GenericTableColumn> getAttributes(@NotNull DBRProgressMonitor monitor) throws DBException {
-        if (columnsLoaded && !columns.isEmpty()) {
-            return columns;
-        }
-        // Fall back to parent implementation if columns weren't loaded
-        return super.getAttributes(monitor);
+        // Do not fall back to super.getAttributes() — it uses JDBC getColumns()
+        // which calls listTables() and recursively lists all directories including .tmp,
+        // causing UNAUTHORIZED errors
+        return columnsLoaded ? columns : List.of();
     }
 
     @Override
     public GenericTableColumn getAttribute(@NotNull DBRProgressMonitor monitor, @NotNull String attributeName) throws DBException {
-        if (columnsLoaded && !columns.isEmpty()) {
+        if (columnsLoaded) {
             for (GenericTableColumn column : columns) {
                 if (column.getName().equals(attributeName)) {
                     return column;
                 }
             }
-            return null;
         }
-        return super.getAttribute(monitor, attributeName);
+        return null;
     }
 
     /**

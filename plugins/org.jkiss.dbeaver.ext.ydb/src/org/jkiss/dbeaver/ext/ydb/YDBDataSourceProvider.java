@@ -24,9 +24,21 @@ import org.jkiss.dbeaver.ext.generic.model.meta.GenericMetaModel;
 import org.jkiss.dbeaver.ext.ydb.model.YDBDataSource;
 import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
+import org.jkiss.dbeaver.model.connection.DBPConnectionConfiguration;
+import org.jkiss.dbeaver.model.connection.DBPDriver;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
+import org.jkiss.utils.CommonUtils;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 public class YDBDataSourceProvider extends GenericDataSourceProvider {
+
+    private static final String PROP_AUTH_TYPE = "ydb.authType";
+    private static final String PROP_TOKEN = "ydb.token";
+    private static final String PROP_SA_FILE = "ydb.saFile";
+    private static final String PROP_USE_SECURE = "ydb.useSecure";
+    private static final String PROP_SSL_CERTIFICATE = "ydb.sslCertificate";
 
     public YDBDataSourceProvider() {
     }
@@ -34,6 +46,79 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider {
     @Override
     public long getFeatures() {
         return FEATURE_CATALOGS;
+    }
+
+    @NotNull
+    @Override
+    public String getConnectionURL(@NotNull DBPDriver driver, @NotNull DBPConnectionConfiguration connectionInfo) {
+        String host = connectionInfo.getHostName();
+        if (CommonUtils.isEmpty(host)) {
+            return super.getConnectionURL(driver, connectionInfo);
+        }
+
+        String port = connectionInfo.getHostPort();
+        String database = connectionInfo.getDatabaseName();
+        String secureStr = connectionInfo.getProviderProperty(PROP_USE_SECURE);
+        boolean secure = CommonUtils.isEmpty(secureStr) || CommonUtils.toBoolean(secureStr);
+
+        StringBuilder url = new StringBuilder();
+        url.append("jdbc:ydb:");
+        url.append(secure ? "grpcs://" : "grpc://");
+        url.append(host);
+        if (!CommonUtils.isEmpty(port)) {
+            url.append(":").append(port);
+        }
+        if (!CommonUtils.isEmpty(database)) {
+            database = "/" + database.replaceAll("^/+", "");
+            url.append(database);
+        }
+
+        StringBuilder params = new StringBuilder();
+        String authType = connectionInfo.getProviderProperty(PROP_AUTH_TYPE);
+        if (!CommonUtils.isEmpty(authType)) {
+            switch (authType) {
+                case "static":
+                    String user = connectionInfo.getUserName();
+                    String password = connectionInfo.getUserPassword();
+                    if (!CommonUtils.isEmpty(user)) {
+                        params.append("user=").append(user);
+                        if (!CommonUtils.isEmpty(password)) {
+                            params.append("&password=").append(password);
+                        }
+                    }
+                    break;
+                case "token":
+                    String token = connectionInfo.getProviderProperty(PROP_TOKEN);
+                    if (!CommonUtils.isEmpty(token)) {
+                        params.append("token=").append(token);
+                    }
+                    break;
+                case "saFile":
+                    String saFile = connectionInfo.getProviderProperty(PROP_SA_FILE);
+                    if (!CommonUtils.isEmpty(saFile)) {
+                        params.append("saKeyFile=").append(URLEncoder.encode(saFile, StandardCharsets.UTF_8));
+                    }
+                    break;
+                case "metadata":
+                    params.append("useMetadata=true");
+                    break;
+            }
+        }
+
+        // Add SSL certificate if specified
+        String sslCert = connectionInfo.getProviderProperty(PROP_SSL_CERTIFICATE);
+        if (!CommonUtils.isEmpty(sslCert)) {
+            if (params.length() > 0) {
+                params.append("&");
+            }
+            params.append("secureConnectionCertificate=").append(URLEncoder.encode(sslCert, StandardCharsets.UTF_8));
+        }
+
+        if (params.length() > 0) {
+            url.append("?").append(params);
+        }
+
+        return url.toString();
     }
 
     @NotNull

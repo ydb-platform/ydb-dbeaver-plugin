@@ -30,6 +30,11 @@ import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.struct.DBSFolder;
 import org.jkiss.dbeaver.model.struct.DBSObject;
 
+import tech.ydb.jdbc.YdbConnection;
+import tech.ydb.jdbc.context.YdbContext;
+import tech.ydb.scheme.SchemeClient;
+
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -135,6 +140,25 @@ public class YDBSystemViewsFolder implements DBSFolder, DBPRefreshableObject {
 
             // Sort views by name
             systemViews.sort(Comparator.comparing(YDBSystemView::getName, String.CASE_INSENSITIVE_ORDER));
+
+            // Load permissions for all system views
+            try (JDBCSession session = DBUtils.openMetaSession(monitor, dataSource, "Load system view permissions")) {
+                Connection conn = session.getOriginal();
+                if (conn.isWrapperFor(YdbConnection.class)) {
+                    YdbConnection ydbConn = conn.unwrap(YdbConnection.class);
+                    YdbContext ctx = ydbConn.getCtx();
+                    SchemeClient schemeClient = ctx.getSchemeClient();
+                    String prefixPath = ctx.getPrefixPath();
+                    for (YDBSystemView view : systemViews) {
+                        view.loadPermissions(schemeClient, prefixPath);
+                    }
+                }
+            } catch (SQLException e) {
+                log.debug("Failed to load system view permissions: " + e.getMessage());
+            } catch (DBCException e) {
+                log.debug("Failed to open session for loading system view permissions: " + e.getMessage());
+            }
+
             viewsLoaded = true;
 
         } finally {

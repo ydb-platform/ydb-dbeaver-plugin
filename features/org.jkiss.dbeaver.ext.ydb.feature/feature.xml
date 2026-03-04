@@ -2,8 +2,8 @@
 <feature
     id="org.jkiss.dbeaver.ext.ydb.feature"
     label="DBeaver YDB Support"
-    version="1.0.0.qualifier"
-    provider-name="DBeaver Corp">
+    version="0.1.0.qualifier"
+    provider-name="YDB">
 
     <description>
         YDB (Yandex Database) support for DBeaver.

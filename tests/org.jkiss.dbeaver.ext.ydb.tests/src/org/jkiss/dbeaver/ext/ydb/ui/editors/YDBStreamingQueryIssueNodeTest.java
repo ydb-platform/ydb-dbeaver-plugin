@@ -16,94 +16,140 @@
  */
 package org.jkiss.dbeaver.ext.ydb.ui.editors;
 
+import org.junit.Before;
 import org.junit.Test;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.List;
 
 import static org.junit.Assert.*;
 
+/**
+ * Tests for YDBStreamingQueryIssueNode.
+ * Uses reflection to load from UI bundle classloader since OSGi classloader
+ * isolation prevents direct access in headless test runtime.
+ */
 public class YDBStreamingQueryIssueNodeTest {
 
-    @Test
-    public void testSeverityLabelInfo() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 1, "msg");
-        assertEquals("INFO", node.getSeverityLabel());
+    private static final String CLASS_NAME = "org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryIssueNode";
+
+    private Class<?> nodeClass;
+    private Constructor<?> nodeConstructor;
+    private Method getSeverityLabel;
+    private Method getMessage;
+    private Method getSeverity;
+    private Method hasChildren;
+    private Method getChildren;
+    private Method getParent;
+    private Method addChild;
+
+    @Before
+    public void setUp() throws Exception {
+        ClassLoader uiLoader = getUiBundleClassLoader();
+        nodeClass = uiLoader.loadClass(CLASS_NAME);
+        nodeConstructor = nodeClass.getConstructor(nodeClass, int.class, String.class);
+        getSeverityLabel = nodeClass.getMethod("getSeverityLabel");
+        getMessage = nodeClass.getMethod("getMessage");
+        getSeverity = nodeClass.getMethod("getSeverity");
+        hasChildren = nodeClass.getMethod("hasChildren");
+        getChildren = nodeClass.getMethod("getChildren");
+        getParent = nodeClass.getMethod("getParent");
+        addChild = nodeClass.getMethod("addChild", nodeClass);
+    }
+
+    private static ClassLoader getUiBundleClassLoader() throws Exception {
+        org.osgi.framework.Bundle[] bundles = org.osgi.framework.FrameworkUtil
+            .getBundle(YDBStreamingQueryIssueNodeTest.class)
+            .getBundleContext()
+            .getBundles();
+        for (org.osgi.framework.Bundle bundle : bundles) {
+            if ("org.jkiss.dbeaver.ext.ydb.ui".equals(bundle.getSymbolicName())) {
+                // Ensure the bundle is started
+                if (bundle.getState() != org.osgi.framework.Bundle.ACTIVE) {
+                    bundle.start();
+                }
+                return bundle.adapt(org.osgi.framework.wiring.BundleWiring.class).getClassLoader();
+            }
+        }
+        throw new ClassNotFoundException("UI bundle not found in OSGi runtime");
+    }
+
+    private Object createNode(Object parent, int severity, String message) throws Exception {
+        return nodeConstructor.newInstance(parent, severity, message);
     }
 
     @Test
-    public void testSeverityLabelWarning() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 2, "msg");
-        assertEquals("WARNING", node.getSeverityLabel());
+    public void testSeverityLabelInfo() throws Exception {
+        assertEquals("INFO", getSeverityLabel.invoke(createNode(null, 1, "msg")));
     }
 
     @Test
-    public void testSeverityLabelError() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 3, "msg");
-        assertEquals("ERROR", node.getSeverityLabel());
+    public void testSeverityLabelWarning() throws Exception {
+        assertEquals("WARNING", getSeverityLabel.invoke(createNode(null, 2, "msg")));
     }
 
     @Test
-    public void testSeverityLabelFatal() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 4, "msg");
-        assertEquals("FATAL", node.getSeverityLabel());
+    public void testSeverityLabelError() throws Exception {
+        assertEquals("ERROR", getSeverityLabel.invoke(createNode(null, 3, "msg")));
     }
 
     @Test
-    public void testSeverityLabelUnknown() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 0, "msg");
-        assertEquals("UNKNOWN(0)", node.getSeverityLabel());
+    public void testSeverityLabelFatal() throws Exception {
+        assertEquals("FATAL", getSeverityLabel.invoke(createNode(null, 4, "msg")));
     }
 
     @Test
-    public void testSeverityLabelUnknownNegative() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, -1, "msg");
-        assertEquals("UNKNOWN(-1)", node.getSeverityLabel());
+    public void testSeverityLabelUnknown() throws Exception {
+        assertEquals("UNKNOWN(0)", getSeverityLabel.invoke(createNode(null, 0, "msg")));
     }
 
     @Test
-    public void testSeverityLabelUnknownHigh() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 99, "msg");
-        assertEquals("UNKNOWN(99)", node.getSeverityLabel());
+    public void testSeverityLabelUnknownNegative() throws Exception {
+        assertEquals("UNKNOWN(-1)", getSeverityLabel.invoke(createNode(null, -1, "msg")));
     }
 
     @Test
-    public void testGetMessage() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 1, "test message");
-        assertEquals("test message", node.getMessage());
+    public void testSeverityLabelUnknownHigh() throws Exception {
+        assertEquals("UNKNOWN(99)", getSeverityLabel.invoke(createNode(null, 99, "msg")));
     }
 
     @Test
-    public void testGetSeverity() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 3, "msg");
-        assertEquals(3, node.getSeverity());
+    public void testGetMessage() throws Exception {
+        assertEquals("test message", getMessage.invoke(createNode(null, 1, "test message")));
     }
 
     @Test
-    public void testHasChildrenFalseInitially() {
-        YDBStreamingQueryIssueNode node = new YDBStreamingQueryIssueNode(null, 1, "msg");
-        assertFalse(node.hasChildren());
-        assertTrue(node.getChildren().isEmpty());
+    public void testGetSeverity() throws Exception {
+        assertEquals(3, getSeverity.invoke(createNode(null, 3, "msg")));
     }
 
     @Test
-    public void testAddChildAndHasChildren() {
-        YDBStreamingQueryIssueNode parent = new YDBStreamingQueryIssueNode(null, 3, "parent");
-        YDBStreamingQueryIssueNode child = new YDBStreamingQueryIssueNode(parent, 1, "child");
-        parent.addChild(child);
-
-        assertTrue(parent.hasChildren());
-        assertEquals(1, parent.getChildren().size());
-        assertSame(child, parent.getChildren().get(0));
+    public void testHasChildrenFalseInitially() throws Exception {
+        Object node = createNode(null, 1, "msg");
+        assertFalse((Boolean) hasChildren.invoke(node));
+        assertTrue(((List<?>) getChildren.invoke(node)).isEmpty());
     }
 
     @Test
-    public void testGetParentNullForRoot() {
-        YDBStreamingQueryIssueNode root = new YDBStreamingQueryIssueNode(null, 1, "root");
-        assertNull(root.getParent());
+    public void testAddChildAndHasChildren() throws Exception {
+        Object parent = createNode(null, 3, "parent");
+        Object child = createNode(parent, 1, "child");
+        addChild.invoke(parent, child);
+        assertTrue((Boolean) hasChildren.invoke(parent));
+        assertEquals(1, ((List<?>) getChildren.invoke(parent)).size());
+        assertSame(child, ((List<?>) getChildren.invoke(parent)).get(0));
     }
 
     @Test
-    public void testGetParentSetForChild() {
-        YDBStreamingQueryIssueNode parent = new YDBStreamingQueryIssueNode(null, 3, "parent");
-        YDBStreamingQueryIssueNode child = new YDBStreamingQueryIssueNode(parent, 1, "child");
-        assertSame(parent, child.getParent());
+    public void testGetParentNullForRoot() throws Exception {
+        assertNull(getParent.invoke(createNode(null, 1, "root")));
+    }
+
+    @Test
+    public void testGetParentSetForChild() throws Exception {
+        Object parent = createNode(null, 3, "parent");
+        Object child = createNode(parent, 1, "child");
+        assertSame(parent, getParent.invoke(child));
     }
 }

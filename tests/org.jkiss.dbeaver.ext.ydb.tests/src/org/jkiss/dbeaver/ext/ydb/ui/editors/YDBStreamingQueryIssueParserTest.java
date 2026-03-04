@@ -16,89 +16,133 @@
  */
 package org.jkiss.dbeaver.ext.ydb.ui.editors;
 
+import org.junit.Before;
 import org.junit.Test;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.junit.Assert.*;
 
+/**
+ * Tests for YDBStreamingQueryIssueParser.
+ * Uses reflection to load from UI bundle classloader.
+ */
 public class YDBStreamingQueryIssueParserTest {
 
-    @Test
-    public void testParseNull() {
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(null);
-        assertTrue(result.isEmpty());
+    private Method parseMethod;
+    private Method getSeverity;
+    private Method getMessage;
+    private Method hasChildren;
+    private Method getChildren;
+    private Method getParent;
+
+    @Before
+    public void setUp() throws Exception {
+        ClassLoader uiLoader = getUiBundleClassLoader();
+
+        Class<?> parserClass = uiLoader.loadClass(
+            "org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryIssueParser");
+        Class<?> nodeClass = uiLoader.loadClass(
+            "org.jkiss.dbeaver.ext.ydb.ui.editors.YDBStreamingQueryIssueNode");
+
+        parseMethod = parserClass.getMethod("parse", String.class);
+        getSeverity = nodeClass.getMethod("getSeverity");
+        getMessage = nodeClass.getMethod("getMessage");
+        hasChildren = nodeClass.getMethod("hasChildren");
+        getChildren = nodeClass.getMethod("getChildren");
+        getParent = nodeClass.getMethod("getParent");
+    }
+
+    private static ClassLoader getUiBundleClassLoader() throws Exception {
+        org.osgi.framework.Bundle[] bundles = org.osgi.framework.FrameworkUtil
+            .getBundle(YDBStreamingQueryIssueParserTest.class)
+            .getBundleContext()
+            .getBundles();
+        for (org.osgi.framework.Bundle bundle : bundles) {
+            if ("org.jkiss.dbeaver.ext.ydb.ui".equals(bundle.getSymbolicName())) {
+                if (bundle.getState() != org.osgi.framework.Bundle.ACTIVE) {
+                    bundle.start();
+                }
+                return bundle.adapt(org.osgi.framework.wiring.BundleWiring.class).getClassLoader();
+            }
+        }
+        throw new ClassNotFoundException("UI bundle not found in OSGi runtime");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object> parse(String json) throws Exception {
+        return (List<Object>) parseMethod.invoke(null, json);
     }
 
     @Test
-    public void testParseEmpty() {
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse("");
-        assertTrue(result.isEmpty());
+    public void testParseNull() throws Exception {
+        assertTrue(parse(null).isEmpty());
     }
 
     @Test
-    public void testParseNotJson() {
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse("not json");
-        assertTrue(result.isEmpty());
+    public void testParseEmpty() throws Exception {
+        assertTrue(parse("").isEmpty());
     }
 
     @Test
-    public void testParseSingleObject() {
-        String json = "{\"severity\": 1, \"message\": \"test issue\"}";
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(json);
+    public void testParseNotJson() throws Exception {
+        assertTrue(parse("not json").isEmpty());
+    }
+
+    @Test
+    public void testParseSingleObject() throws Exception {
+        List<Object> result = parse("{\"severity\": 1, \"message\": \"test issue\"}");
         assertEquals(1, result.size());
-        assertEquals(1, result.get(0).getSeverity());
-        assertEquals("test issue", result.get(0).getMessage());
+        assertEquals(1, getSeverity.invoke(result.get(0)));
+        assertEquals("test issue", getMessage.invoke(result.get(0)));
     }
 
     @Test
-    public void testParseArray() {
-        String json = "[{\"severity\": 2, \"message\": \"warn\"}, {\"severity\": 3, \"message\": \"err\"}]";
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(json);
+    public void testParseArray() throws Exception {
+        List<Object> result = parse("[{\"severity\": 2, \"message\": \"warn\"}, {\"severity\": 3, \"message\": \"err\"}]");
         assertEquals(2, result.size());
-        assertEquals(2, result.get(0).getSeverity());
-        assertEquals("warn", result.get(0).getMessage());
-        assertEquals(3, result.get(1).getSeverity());
-        assertEquals("err", result.get(1).getMessage());
+        assertEquals(2, getSeverity.invoke(result.get(0)));
+        assertEquals("warn", getMessage.invoke(result.get(0)));
+        assertEquals(3, getSeverity.invoke(result.get(1)));
+        assertEquals("err", getMessage.invoke(result.get(1)));
     }
 
     @Test
-    public void testParseNestedIssues() {
+    public void testParseNestedIssues() throws Exception {
         String json = "{\"severity\": 3, \"message\": \"parent\", \"issues\": ["
             + "{\"severity\": 1, \"message\": \"child1\"},"
             + "{\"severity\": 2, \"message\": \"child2\"}"
             + "]}";
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(json);
+        List<Object> result = parse(json);
         assertEquals(1, result.size());
-        YDBStreamingQueryIssueNode root = result.get(0);
-        assertEquals("parent", root.getMessage());
-        assertTrue(root.hasChildren());
-        assertEquals(2, root.getChildren().size());
-        assertEquals("child1", root.getChildren().get(0).getMessage());
-        assertEquals("child2", root.getChildren().get(1).getMessage());
-        assertSame(root, root.getChildren().get(0).getParent());
+        Object root = result.get(0);
+        assertEquals("parent", getMessage.invoke(root));
+        assertTrue((Boolean) hasChildren.invoke(root));
+        List<?> children = (List<?>) getChildren.invoke(root);
+        assertEquals(2, children.size());
+        assertEquals("child1", getMessage.invoke(children.get(0)));
+        assertEquals("child2", getMessage.invoke(children.get(1)));
+        assertSame(root, getParent.invoke(children.get(0)));
     }
 
     @Test
-    public void testParseMissingSeverityDefaultsToZero() {
-        String json = "{\"message\": \"no severity\"}";
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(json);
+    public void testParseMissingSeverityDefaultsToZero() throws Exception {
+        List<Object> result = parse("{\"message\": \"no severity\"}");
         assertEquals(1, result.size());
-        assertEquals(0, result.get(0).getSeverity());
+        assertEquals(0, getSeverity.invoke(result.get(0)));
     }
 
     @Test
-    public void testParseMissingMessageDefaultsToEmpty() {
-        String json = "{\"severity\": 4}";
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(json);
+    public void testParseMissingMessageDefaultsToEmpty() throws Exception {
+        List<Object> result = parse("{\"severity\": 4}");
         assertEquals(1, result.size());
-        assertEquals("", result.get(0).getMessage());
+        assertEquals("", getMessage.invoke(result.get(0)));
     }
 
     @Test
-    public void testParseRootNodeHasNullParent() {
-        String json = "{\"severity\": 1, \"message\": \"root\"}";
-        List<YDBStreamingQueryIssueNode> result = YDBStreamingQueryIssueParser.parse(json);
-        assertNull(result.get(0).getParent());
+    public void testParseRootNodeHasNullParent() throws Exception {
+        List<Object> result = parse("{\"severity\": 1, \"message\": \"root\"}");
+        assertNull(getParent.invoke(result.get(0)));
     }
 }
