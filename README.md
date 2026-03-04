@@ -219,7 +219,7 @@ This method enables automatic updates.
 **Step 3.** In the "Add Repository" dialog enter the URL in the **Location** field:
 
 ```
-https://storage.yandexcloud.net/ydb-dbeaver/dbeaver
+https://storage.yandexcloud.net/ydb-dbeaver-plugin
 ```
 
 ```
@@ -229,7 +229,7 @@ https://storage.yandexcloud.net/ydb-dbeaver/dbeaver
 │ Name: [YDB Plugin                     ] │
 │                                         │
 │ Location: [https://storage.yandexcloud. │
-│            net/ydb-dbeaver/dbeaver    ]  │
+│            net/ydb-dbeaver-plugin    ]  │
 │           [Local...] [Archive...]       │
 │                          [Add] [Cancel] │
 └─────────────────────────────────────────┘
@@ -534,7 +534,7 @@ Each new build automatically gets a unique version like `1.0.0.v20260302-1652` (
 
 ### URL installation — automatic updates work
 
-If the plugin was installed via **Help → Install New Software → Add → URL** `https://storage.yandexcloud.net/ydb-dbeaver/dbeaver` (Method 2), DBeaver remembers that URL. Publishing a new repository at the same URL is enough:
+If the plugin was installed via **Help → Install New Software → Add → URL** `https://storage.yandexcloud.net/ydb-dbeaver-plugin` (Method 2), DBeaver remembers that URL. Publishing a new repository at the same URL is enough:
 
 Users receive the update:
 
@@ -562,7 +562,7 @@ If the plugin was installed via **Archive...** (local ZIP file), DBeaver does no
 2. Remove the old version: **Help → About DBeaver → Installation Details → select plugin → Uninstall** → restart
 3. Install the new version from ZIP following the same instructions as the first time
 
-> **Recommendation:** install via URL `https://storage.yandexcloud.net/ydb-dbeaver/dbeaver` (Method 2) to receive updates automatically.
+> **Recommendation:** install via URL `https://storage.yandexcloud.net/ydb-dbeaver-plugin` (Method 2) to receive updates automatically.
 
 ---
 

@@ -5,6 +5,9 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
+permissions:
+  contents: write
+
 jobs:
   validate:
     name: Validate version
@@ -60,7 +63,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET }}
         run: |
           REPO_DIR="repository/target/repository"
-          S3_DEST="s3://ydb-dbeaver/dbeaver/"
+          S3_DEST="s3://ydb-dbeaver-plugin/"
           YC_ENDPOINT="https://storage.yandexcloud.net"
 
           aws s3 sync "$REPO_DIR" "$S3_DEST" \
@@ -88,4 +91,19 @@ jobs:
             --endpoint-url "$YC_ENDPOINT" \
             --no-progress
 
-          echo "Deployed to: ${YC_ENDPOINT}/ydb-dbeaver/dbeaver"
+          echo "Deployed to: ${YC_ENDPOINT}/ydb-dbeaver-plugin"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: YDB DBeaver Plugin ${{ github.ref_name }}
+          body: |
+            ## Installation
+
+            1. Open DBeaver → **Help** → **Install New Software…**
+            2. Click **Add…** and enter the P2 repository URL:
+               ```
+               https://storage.yandexcloud.net/ydb-dbeaver-plugin
+               ```
+            3. Select **YDB DBeaver Plugin** and complete the installation.
