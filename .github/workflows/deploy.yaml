@@ -62,13 +62,17 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.YC_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.YC_SECRET }}
         run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
           REPO_DIR="repository/target/repository"
-          S3_DEST="s3://ydb-dbeaver-plugin/"
+          S3_BASE="s3://ydb-dbeaver-plugin"
+          S3_DEST="${S3_BASE}/${VERSION_NUM}/"
           YC_ENDPOINT="https://storage.yandexcloud.net"
 
+          # Upload versioned P2 repository
           aws s3 sync "$REPO_DIR" "$S3_DEST" \
             --endpoint-url "$YC_ENDPOINT" \
-            --delete --no-progress \
+            --no-progress \
             --exclude '*' --include '*.jar' \
             --content-type 'application/java-archive'
 
@@ -91,7 +95,62 @@ jobs:
             --endpoint-url "$YC_ENDPOINT" \
             --no-progress
 
-          echo "Deployed to: ${YC_ENDPOINT}/ydb-dbeaver-plugin"
+          # Collect all version subdirectories from S3
+          VERSIONS=$(aws s3 ls "${S3_BASE}/" \
+            --endpoint-url "$YC_ENDPOINT" \
+            | awk '/\/$/ {print $NF}' | sed 's|/$||' | sort -V)
+
+          CHILDREN_COUNT=$(echo "$VERSIONS" | wc -l | tr -d ' ')
+          TIMESTAMP=$(date +%s)000
+
+          CHILDREN=""
+          while IFS= read -r v; do
+            CHILDREN="${CHILDREN}    <child location='${v}'/>"$'\n'
+          done <<< "$VERSIONS"
+
+          # Generate compositeArtifacts.xml
+          cat > compositeArtifacts.xml << EOF
+          <?xml version='1.0' encoding='UTF-8'?>
+          <?compositeArtifactRepository version='1.0.0'?>
+          <repository name='YDB DBeaver Plugin' type='org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository' version='1.0.0'>
+            <properties size='1'>
+              <property name='p2.timestamp' value='${TIMESTAMP}'/>
+            </properties>
+            <children size='${CHILDREN_COUNT}'>
+          ${CHILDREN}  </children>
+          </repository>
+          EOF
+
+          # Generate compositeContent.xml
+          cat > compositeContent.xml << EOF
+          <?xml version='1.0' encoding='UTF-8'?>
+          <?compositeMetadataRepository version='1.0.0'?>
+          <repository name='YDB DBeaver Plugin' type='org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository' version='1.0.0'>
+            <properties size='1'>
+              <property name='p2.timestamp' value='${TIMESTAMP}'/>
+            </properties>
+            <children size='${CHILDREN_COUNT}'>
+          ${CHILDREN}  </children>
+          </repository>
+          EOF
+
+          # Generate p2.index
+          cat > p2.index << EOF
+          version=1
+          metadata.repository.factory.order=compositeContent,\!
+          artifact.repository.factory.order=compositeArtifacts,\!
+          EOF
+
+          # Upload composite files to bucket root
+          aws s3 cp compositeArtifacts.xml "${S3_BASE}/compositeArtifacts.xml" \
+            --endpoint-url "$YC_ENDPOINT" --content-type 'application/xml'
+          aws s3 cp compositeContent.xml "${S3_BASE}/compositeContent.xml" \
+            --endpoint-url "$YC_ENDPOINT" --content-type 'application/xml'
+          aws s3 cp p2.index "${S3_BASE}/p2.index" \
+            --endpoint-url "$YC_ENDPOINT" --content-type 'text/plain'
+
+          echo "Deployed ${VERSION_NUM} to: ${YC_ENDPOINT}/ydb-dbeaver-plugin/${VERSION_NUM}"
+          echo "Composite repository updated with versions: $(echo $VERSIONS | tr '\n' ' ')"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
