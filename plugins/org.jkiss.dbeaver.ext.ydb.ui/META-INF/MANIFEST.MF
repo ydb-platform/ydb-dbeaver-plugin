@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: DBeaver YDB UI
 Bundle-SymbolicName: org.jkiss.dbeaver.ext.ydb.ui;singleton:=true
-Bundle-Version: 0.1.0.qualifier
+Bundle-Version: 0.1.0
 Bundle-Release-Date: 20260123
 Require-Bundle: org.eclipse.swt,
  org.eclipse.jface,
