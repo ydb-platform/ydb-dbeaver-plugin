@@ -56,6 +56,7 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
     public static final String PROP_MONITORING_URL = "ydb.monitoringUrl";
     public static final String PROP_AUTOCOMPLETE_API_ENABLED = "ydb.autocompleteApiEnabled";
     public static final String PROP_SSL_CERTIFICATE = "ydb.sslCertificate";
+    public static final String PROP_DATA_ENGINEERING_MODE = "ydb.dataEngineeringMode";
 
     private Text hostText;
     private Text portText;
@@ -69,6 +70,7 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
     private Button saFileBrowseButton;
     private Button useSecureCheckbox;
     private Button autocompleteApiCheckbox;
+    private Button dataEngineeringModeCheckbox;
     private Text sslCertificateText;
     private Button sslCertificateBrowseButton;
     private Label sslCertificateLabel;
@@ -186,6 +188,13 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         autocompleteApiCheckbox = UIUtils.createCheckbox(connectionGroup,
             YDBUIMessages.dialog_connection_autocomplete_api,
             YDBUIMessages.dialog_connection_autocomplete_api_tip,
+            true,
+            4);
+
+        // Data Engineering mode
+        dataEngineeringModeCheckbox = UIUtils.createCheckbox(connectionGroup,
+            YDBUIMessages.dialog_connection_data_engineering_mode,
+            YDBUIMessages.dialog_connection_data_engineering_mode_tip,
             true,
             4);
 
@@ -461,6 +470,10 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         String autocompleteEnabled = connectionInfo.getProviderProperty(PROP_AUTOCOMPLETE_API_ENABLED);
         autocompleteApiCheckbox.setSelection(CommonUtils.isEmpty(autocompleteEnabled) || CommonUtils.toBoolean(autocompleteEnabled));
 
+        // Load data engineering mode setting (enabled by default)
+        String dataEngineeringMode = connectionInfo.getProviderProperty(PROP_DATA_ENGINEERING_MODE);
+        dataEngineeringModeCheckbox.setSelection(CommonUtils.isEmpty(dataEngineeringMode) || CommonUtils.toBoolean(dataEngineeringMode));
+
         updateAuthControls();
         updateSslCertControls();
         updateUrl();
@@ -547,6 +560,9 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
 
         // Save autocomplete API setting
         connectionInfo.setProviderProperty(PROP_AUTOCOMPLETE_API_ENABLED, String.valueOf(autocompleteApiCheckbox.getSelection()));
+
+        // Save data engineering mode setting
+        connectionInfo.setProviderProperty(PROP_DATA_ENGINEERING_MODE, String.valueOf(dataEngineeringModeCheckbox.getSelection()));
 
         // Update URL
         updateUrl();

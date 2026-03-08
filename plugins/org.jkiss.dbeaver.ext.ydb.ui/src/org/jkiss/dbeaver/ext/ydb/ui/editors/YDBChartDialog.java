@@ -46,11 +46,11 @@ import org.jfree.data.xy.XYDataset;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 import org.jkiss.dbeaver.Log;
+import org.jkiss.dbeaver.ext.ydb.model.data.YDBChartDataConverter;
 import org.jkiss.dbeaver.model.DBPDataKind;
 import org.jkiss.dbeaver.model.data.DBDAttributeBinding;
 import org.jkiss.dbeaver.runtime.DBWorkbench;
 import org.jkiss.dbeaver.ui.charts.BaseChartComposite;
-import org.jkiss.dbeaver.ui.controls.resultset.ResultSetModel;
 import org.jkiss.dbeaver.ui.controls.resultset.ResultSetRow;
 
 import java.awt.BasicStroke;
@@ -59,7 +59,6 @@ import java.awt.Font;
 import java.awt.geom.Ellipse2D;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -94,7 +93,6 @@ public class YDBChartDialog extends Dialog {
 
     private final List<DBDAttributeBinding> attributes;
     private final List<ResultSetRow> rows;
-    private final ResultSetModel model;
 
     private Combo chartTypeCombo;
 
@@ -112,11 +110,10 @@ public class YDBChartDialog extends Dialog {
     private BaseChartComposite chartComposite;
 
     public YDBChartDialog(Shell parentShell, List<DBDAttributeBinding> attributes,
-                          List<ResultSetRow> rows, ResultSetModel model) {
+                          List<ResultSetRow> rows) {
         super(parentShell);
         this.attributes = attributes;
         this.rows = rows;
-        this.model = model;
         setShellStyle(getShellStyle() | SWT.RESIZE | SWT.MAX);
     }
 
@@ -258,8 +255,8 @@ public class YDBChartDialog extends Dialog {
 
         DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
         for (ResultSetRow row : rows) {
-            String name = formatValue(model.getCellValue(namesAttr, row));
-            double value = toDouble(model.getCellValue(valuesAttr, row));
+            String name = formatValue(getCellValue(namesAttr, row));
+            double value = toDouble(getCellValue(valuesAttr, row));
             dataset.setValue(name, value);
         }
 
@@ -298,7 +295,7 @@ public class YDBChartDialog extends Dialog {
         List<String> tooltipLabels = new ArrayList<>();
         if (labelsAttr != null) {
             for (ResultSetRow row : rows) {
-                tooltipLabels.add(formatValue(model.getCellValue(labelsAttr, row)));
+                tooltipLabels.add(formatValue(getCellValue(labelsAttr, row)));
             }
         }
 
@@ -326,8 +323,8 @@ public class YDBChartDialog extends Dialog {
     private JFreeChart buildTimeSeriesChart(DBDAttributeBinding xAttr, DBDAttributeBinding yAttr) {
         TimeSeries series = new TimeSeries(yAttr.getName());
         for (ResultSetRow row : rows) {
-            Date date = toDate(model.getCellValue(xAttr, row));
-            double value = toDouble(model.getCellValue(yAttr, row));
+            Date date = toDate(getCellValue(xAttr, row));
+            double value = toDouble(getCellValue(yAttr, row));
             if (date != null) {
                 series.addOrUpdate(new Millisecond(date), value);
             }
@@ -351,8 +348,8 @@ public class YDBChartDialog extends Dialog {
     private JFreeChart buildXYChart(DBDAttributeBinding xAttr, DBDAttributeBinding yAttr) {
         XYSeries series = new XYSeries(yAttr.getName());
         for (ResultSetRow row : rows) {
-            double x = toDouble(model.getCellValue(xAttr, row));
-            double y = toDouble(model.getCellValue(yAttr, row));
+            double x = toDouble(getCellValue(xAttr, row));
+            double y = toDouble(getCellValue(yAttr, row));
             series.add(x, y);
         }
 
@@ -430,32 +427,20 @@ public class YDBChartDialog extends Dialog {
         return (DBDAttributeBinding) combo.getData(name);
     }
 
+    private Object getCellValue(DBDAttributeBinding attr, ResultSetRow row) {
+        return YDBChartDataConverter.getCellValue(row.getValues(), attr.getOrdinalPosition());
+    }
+
     private String formatValue(Object val) {
-        return val == null ? "" : val.toString();
+        return YDBChartDataConverter.formatValue(val);
     }
 
     private double toDouble(Object val) {
-        if (val == null) {
-            return Double.NaN;
-        }
-        if (val instanceof Number) {
-            return ((Number) val).doubleValue();
-        }
-        try {
-            return Double.parseDouble(val.toString());
-        } catch (NumberFormatException e) {
-            return Double.NaN;
-        }
+        return YDBChartDataConverter.toDouble(val);
     }
 
     private Date toDate(Object val) {
-        if (val instanceof Date) {
-            return (Date) val;
-        }
-        if (val instanceof Timestamp) {
-            return new Date(((Timestamp) val).getTime());
-        }
-        return null;
+        return YDBChartDataConverter.toDate(val);
     }
 
     @Override

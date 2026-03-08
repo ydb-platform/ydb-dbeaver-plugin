@@ -69,6 +69,7 @@ public class YDBDataSource extends GenericDataSource {
     private static final Log log = Log.getLog(YDBDataSource.class);
 
     public static final String PROP_AUTOCOMPLETE_API_ENABLED = "ydb.autocompleteApiEnabled";
+    public static final String PROP_DATA_ENGINEERING_MODE = "ydb.dataEngineeringMode";
 
     private String ydbVersion = null;
     private YDBAutocompleteClient autocompleteClient;
@@ -431,6 +432,19 @@ public class YDBDataSource extends GenericDataSource {
      */
     public boolean showSystemViewsFolder() {
         return getContainer().getNavigatorSettings().isShowSystemObjects();
+    }
+
+    /**
+     * Check if Data Engineering mode is enabled.
+     * When enabled, all YDB objects are shown (Topics, Transfers, Views, etc.).
+     * When disabled, only Tables and External Tables are shown.
+     * Used by plugin.xml visibleIf condition on tree folders.
+     */
+    public boolean isDataEngineeringMode() {
+        String value = getContainer().getConnectionConfiguration()
+            .getProviderProperty(PROP_DATA_ENGINEERING_MODE);
+        // Enabled by default
+        return value == null || Boolean.parseBoolean(value);
     }
 
     /**

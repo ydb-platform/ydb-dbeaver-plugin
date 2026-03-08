@@ -60,7 +60,7 @@ public class YDBChartHandler extends AbstractHandler {
         }
 
         YDBChartDialog dialog = new YDBChartDialog(
-            HandlerUtil.getActiveShell(event), attributes, rows, model);
+            HandlerUtil.getActiveShell(event), attributes, rows);
         dialog.open();
 
         return null;

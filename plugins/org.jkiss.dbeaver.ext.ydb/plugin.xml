@@ -40,7 +40,7 @@
                     </items>
                 </folder>
                 <!-- System views from .sys directory (read-only) -->
-                <folder label="%tree.system_views.node.name" icon="#folder_view" description="%tree.system_views.node.tip" >
+                <folder label="%tree.system_views.node.name" icon="#folder_view" description="%tree.system_views.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <items label="%tree.system_view.node.name" path="systemView" property="systemViews" icon="#view">
                         <folder type="org.jkiss.dbeaver.ext.generic.model.GenericTableColumn" label="%tree.columns.node.name" icon="#columns">
                             <items label="%tree.column.node.name" path="attribute" property="attributes" icon="#column"/>
@@ -48,15 +48,15 @@
                     </items>
                 </folder>
                 <!-- Resource pools from .sys/resource_pools -->
-                <folder label="%tree.resource_pools.node.name" icon="#folder" description="%tree.resource_pools.node.tip" >
+                <folder label="%tree.resource_pools.node.name" icon="#folder" description="%tree.resource_pools.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <items label="%tree.resource_pool.node.name" path="resourcePool" property="resourcePools" icon="#folder"/>
                 </folder>
                 <!-- Resource pool classifiers from .sys/resource_pool_classifiers -->
-                <folder label="%tree.resource_pool_classifiers.node.name" icon="#folder" description="%tree.resource_pool_classifiers.node.tip" >
+                <folder label="%tree.resource_pool_classifiers.node.name" icon="#folder" description="%tree.resource_pool_classifiers.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <items label="%tree.resource_pool_classifier.node.name" path="resourcePoolClassifier" property="resourcePoolClassifiers" icon="#folder"/>
                 </folder>
                 <!-- Topics (PersQueueGroup) for message streaming -->
-                <folder id="ydbTopics" label="%tree.topics.node.name" icon="#folder_table" description="%tree.topics.node.tip" >
+                <folder id="ydbTopics" label="%tree.topics.node.name" icon="#folder_table" description="%tree.topics.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <!-- Subfolders (for topics with "/" in paths) -->
                     <items label="%tree.topic_folder.node.name" path="topicFolder" property="topicFolders" icon="#folder_table">
                         <!-- Nested subfolders (recursive) -->
@@ -68,7 +68,7 @@
                     <items label="%tree.topic.node.name" path="topic" property="rootTopics" icon="#table"/>
                 </folder>
                 <!-- Transfers for data replication -->
-                <folder id="ydbTransfers" label="%tree.transfers.node.name" icon="#folder_table" description="%tree.transfers.node.tip" >
+                <folder id="ydbTransfers" label="%tree.transfers.node.name" icon="#folder_table" description="%tree.transfers.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <!-- Subfolders (for transfers with "/" in paths) -->
                     <items label="%tree.transfer_folder.node.name" path="transferFolder" property="transferFolders" icon="#folder_table">
                         <!-- Nested subfolders (recursive) -->
@@ -80,7 +80,7 @@
                     <items label="%tree.transfer.node.name" path="transfer" property="rootTransfers" icon="#table"/>
                 </folder>
                 <!-- External Data Sources -->
-                <folder id="ydbExternalDataSources" label="%tree.external_data_sources.node.name" icon="#folder_table" description="%tree.external_data_sources.node.tip" >
+                <folder id="ydbExternalDataSources" label="%tree.external_data_sources.node.name" icon="#folder_table" description="%tree.external_data_sources.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <items label="%tree.external_data_source_folder.node.name" path="extDsFolder" property="externalDataSourceFolders" icon="#folder_table">
                         <items label="%tree.external_data_source_folder.node.name" path="extDsSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
                         <items label="%tree.external_data_source.node.name" path="extDs" property="externalDataSources" icon="#table"/>
@@ -88,7 +88,7 @@
                     <items label="%tree.external_data_source.node.name" path="extDs" property="rootExternalDataSources" icon="#table"/>
                 </folder>
                 <!-- External Tables -->
-                <folder id="ydbExternalTables" label="%tree.external_tables.node.name" icon="#folder_table" description="%tree.external_tables.node.tip" >
+                <folder id="ydbExternalTables" label="%tree.external_tables.node.name" icon="#folder_table" description="%tree.external_tables.node.tip">
                     <items label="%tree.external_table_folder.node.name" path="extTableFolder" property="externalTableFolders" icon="#folder_table">
                         <items label="%tree.external_table_folder.node.name" path="extTableSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
                         <items label="%tree.external_table.node.name" path="extTable" property="externalTables" icon="#table">
@@ -104,7 +104,7 @@
                     </items>
                 </folder>
                 <!-- Views -->
-                <folder id="ydbViews" label="%tree.views.node.name" icon="#folder_view" description="%tree.views.node.tip">
+                <folder id="ydbViews" label="%tree.views.node.name" icon="#folder_view" description="%tree.views.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <items label="%tree.view_folder.node.name" path="viewFolder" property="viewFolders" icon="#folder_view">
                         <items label="%tree.view_folder.node.name" path="viewSubFolder" property="subFolders" icon="#folder_view" recursive=".."/>
                         <items label="%tree.view.node.name" path="view" property="views" icon="#view"/>
@@ -112,7 +112,7 @@
                     <items label="%tree.view.node.name" path="view" property="rootViews" icon="#view"/>
                 </folder>
                 <!-- Streaming queries from .sys/streaming_queries -->
-                <folder id="ydbStreamingQueries" label="%tree.streaming_queries.node.name" icon="#folder" description="%tree.streaming_queries.node.tip" >
+                <folder id="ydbStreamingQueries" label="%tree.streaming_queries.node.name" icon="#folder" description="%tree.streaming_queries.node.tip" visibleIf="object.isDataEngineeringMode()">
                     <!-- Subfolders (for queries with "/" in Path) -->
                     <items label="%tree.streaming_query_folder.node.name" path="streamingQueryFolder" property="streamingQueryFolders" icon="#folder">
                         <!-- Nested subfolders (recursive) -->
