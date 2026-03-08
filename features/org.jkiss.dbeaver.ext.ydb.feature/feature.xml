@@ -2,7 +2,7 @@
 <feature
     id="org.jkiss.dbeaver.ext.ydb.feature"
     label="DBeaver YDB Support"
-    version="0.1.0.qualifier"
+    version="0.1.0"
     provider-name="YDB">
 
     <description>
