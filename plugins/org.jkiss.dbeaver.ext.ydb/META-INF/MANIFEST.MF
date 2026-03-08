@@ -17,7 +17,8 @@ Export-Package: org.jkiss.dbeaver.ext.ydb,
  org.jkiss.dbeaver.ext.ydb.model.dashboard
 Import-Package: org.slf4j
 Bundle-ClassPath: .,
- lib/ydb-jdbc-driver-shaded-2.3.10.jar
+ lib/ydb-jdbc-driver-shaded-2.3.10.jar,
+ lib/ydb-plugin-core-1.0.0.jar
 Bundle-ActivationPolicy: lazy
 Bundle-Localization: OSGI-INF/l10n/bundle
 Bundle-RequiredExecutionEnvironment: JavaSE-21

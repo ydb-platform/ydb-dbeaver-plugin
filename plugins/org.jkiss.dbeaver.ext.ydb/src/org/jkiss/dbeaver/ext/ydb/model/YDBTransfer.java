@@ -187,7 +187,8 @@ public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptOb
         }
         this.prefixPath = prefixPath;
         String absolutePath = prefixPath + "/" + fullPath;
-        YDBDescribeHelper.TransferInfo info = YDBDescribeHelper.describeTransfer(transport, absolutePath);
+        org.jkiss.dbeaver.ext.ydb.core.YDBGrpcHelper.TransferInfo info =
+            YDBDescribeHelper.describeTransfer(transport, absolutePath);
         if (info != null) {
             sourcePath = info.sourcePath;
             destinationPath = info.destinationPath;
@@ -196,8 +197,8 @@ public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptOb
             state = info.state;
             consumerName = info.consumerName;
             owner = info.owner;
-            explicitPermissions = info.permissions;
-            effectivePermissionsEntries = info.effectivePermissions;
+            explicitPermissions = YDBDescribeHelper.convertPermissions(info.permissions);
+            effectivePermissionsEntries = YDBDescribeHelper.convertPermissions(info.effectivePermissions);
             permissionsLoaded = true;
         } else if (schemeClient != null && !permissionsLoaded) {
             loadPermissions(schemeClient, prefixPath);

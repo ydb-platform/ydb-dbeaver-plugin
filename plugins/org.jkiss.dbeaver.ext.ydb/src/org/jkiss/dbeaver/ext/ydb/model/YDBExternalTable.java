@@ -299,15 +299,15 @@ public class YDBExternalTable extends GenericTable implements YDBPermissionHolde
             return;
         }
         String absolutePath = prefixPath + "/" + fullPath;
-        YDBDescribeHelper.ExternalTableInfo info =
+        org.jkiss.dbeaver.ext.ydb.core.YDBGrpcHelper.ExternalTableInfo info =
             YDBDescribeHelper.describeExternalTable(transport, absolutePath);
         if (info != null) {
             sourceType = info.sourceType;
             dataSourcePath = info.dataSourcePath;
             location = info.location;
             owner = info.owner;
-            explicitPermissions = info.permissions;
-            effectivePermissionsEntries = info.effectivePermissions;
+            explicitPermissions = YDBDescribeHelper.convertPermissions(info.permissions);
+            effectivePermissionsEntries = YDBDescribeHelper.convertPermissions(info.effectivePermissions);
             permissionsLoaded = true;
 
             Map<String, String> content = info.content;
@@ -359,7 +359,7 @@ public class YDBExternalTable extends GenericTable implements YDBPermissionHolde
                 }
 
                 String absolutePath = prefixPath + "/" + fullPath;
-                YDBDescribeHelper.ExternalTableInfo info =
+                org.jkiss.dbeaver.ext.ydb.core.YDBGrpcHelper.ExternalTableInfo info =
                     YDBDescribeHelper.describeExternalTable(transport, absolutePath);
 
                 if (info != null) {

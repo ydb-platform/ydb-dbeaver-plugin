@@ -29,6 +29,12 @@
                                     <version>2.3.10</version>
                                     <outputDirectory>${project.basedir}/lib</outputDirectory>
                                 </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.jkiss.dbeaver.ext.ydb</groupId>
+                                    <artifactId>ydb-plugin-core</artifactId>
+                                    <version>1.0.0</version>
+                                    <outputDirectory>${project.basedir}/lib</outputDirectory>
+                                </artifactItem>
                             </artifactItems>
                         </configuration>
                     </execution>

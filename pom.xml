@@ -19,6 +19,7 @@
     </properties>
 
     <modules>
+        <module>ydb-plugin-core</module>
         <module>plugins/org.jkiss.dbeaver.ext.ydb</module>
         <module>plugins/org.jkiss.dbeaver.ext.ydb.ui</module>
         <module>features/org.jkiss.dbeaver.ext.ydb.feature</module>

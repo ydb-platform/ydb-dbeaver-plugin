@@ -46,9 +46,7 @@ public class YDBResourcePoolsFolder implements DBSFolder, DBPRefreshableObject {
     private static final Log log = Log.getLog(YDBResourcePoolsFolder.class);
 
     private static final String RESOURCE_POOLS_QUERY =
-        "SELECT Name, ConcurrentQueryLimit, QueueSize, DatabaseLoadCpuThreshold, " +
-        "ResourceWeight, TotalCpuLimitPercentPerNode, QueryCpuLimitPercentPerNode, " +
-        "QueryMemoryLimitPercentPerNode FROM `.sys/resource_pools`";
+        org.jkiss.dbeaver.ext.ydb.core.YDBSysQueries.RESOURCE_POOLS_QUERY;
 
     private final YDBDataSource dataSource;
     private List<YDBResourcePool> resourcePools;

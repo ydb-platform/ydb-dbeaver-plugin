@@ -49,7 +49,8 @@ public class YDBStreamingQueriesFolder implements DBSFolder, DBPRefreshableObjec
 
     private static final Log log = Log.getLog(YDBStreamingQueriesFolder.class);
 
-    private static final String STREAMING_QUERIES_QUERY = "SELECT * FROM `.sys/streaming_queries`";
+    private static final String STREAMING_QUERIES_QUERY =
+        org.jkiss.dbeaver.ext.ydb.core.YDBSysQueries.STREAMING_QUERIES_QUERY;
 
     private final YDBDataSource dataSource;
     private Map<String, YDBStreamingQueryFolder> rootFolders;

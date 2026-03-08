@@ -218,14 +218,14 @@ public class YDBExternalDataSource implements DBSObject, DBPRefreshableObject, Y
             return;
         }
         String absolutePath = prefixPath + "/" + fullPath;
-        YDBDescribeHelper.ExternalDataSourceInfo info =
+        org.jkiss.dbeaver.ext.ydb.core.YDBGrpcHelper.ExternalDataSourceInfo info =
             YDBDescribeHelper.describeExternalDataSource(transport, absolutePath);
         if (info != null) {
             sourceType = info.sourceType;
             location = info.location;
             owner = info.owner;
-            explicitPermissions = info.permissions;
-            effectivePermissionsEntries = info.effectivePermissions;
+            explicitPermissions = YDBDescribeHelper.convertPermissions(info.permissions);
+            effectivePermissionsEntries = YDBDescribeHelper.convertPermissions(info.effectivePermissions);
             permissionsLoaded = true;
 
             // Additional properties from the map
