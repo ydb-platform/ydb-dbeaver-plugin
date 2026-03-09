@@ -28,5 +28,7 @@ openspec/
 TODO.md
 pg-ydb-diff.md
 
-# Local helper scripts
+# Local helper scripts (except CI/test runners)
 *.sh
+!run-integration-tests.sh
+!integration-tests/run-tests.sh
