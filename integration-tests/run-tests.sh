@@ -63,10 +63,10 @@ $RT run -d \
     -e MINIO_ROOT_PASSWORD=minioadmin \
     "${MINIO_IMAGE}" server /data --address ":${MINIO_PORT}" >/dev/null
 
-# ── start YDB ────────────────────────────────────────────────────────────────
+# ── start YDB (first time) to generate default config ────────────────────────
 # YDB_USE_IN_MEMORY_PDISKS=false is required: Topics, Views, and Resource Pools
 # do not work with in-memory pdisks. YDB_PDISK_SIZE is in bytes (64 GB sparse).
-log "Starting YDB ${YDB_IMAGE} ..."
+log "Starting YDB ${YDB_IMAGE} to generate config ..."
 $RT run -d \
     --name "${YDB_CONTAINER}" \
     --network=host \
@@ -76,10 +76,9 @@ $RT run -d \
     -e GRPC_PORT="${YDB_PORT}" \
     "${YDB_IMAGE}" >/dev/null
 
-# ── wait for YDB to become available ─────────────────────────────────────────
-log "Waiting for YDB on port ${YDB_PORT} ..."
+log "Waiting for YDB (health_check) ..."
 for i in $(seq 1 "${WAIT_TIMEOUT}"); do
-    if port_open "${YDB_PORT}"; then
+    if $RT exec "${YDB_CONTAINER}" /health_check >/dev/null 2>&1; then
         log "YDB ready after ${i}s"
         break
     fi
@@ -90,31 +89,42 @@ for i in $(seq 1 "${WAIT_TIMEOUT}"); do
     sleep 1
 done
 
-# ── enable required feature flags ────────────────────────────────────────────
-# Copy config out, patch on host, copy back, restart container.
-log "Enabling feature flags and grpc replication service ..."
-TMP_CONFIG="/tmp/ydb-it-config.yaml"
-$RT cp "${YDB_CONTAINER}:${YDB_CONFIG_PATH}" "${TMP_CONFIG}"
+# ── patch config, then re-run with --config-path ─────────────────────────────
+# local_ydb deploy regenerates config.yaml on every start UNLESS --config-path
+# is given — in that case it copies the provided file instead of generating.
+# We patch the generated config on the host, save it to a separate path,
+# then re-run the container pointing --config-path at that file (mounted via -v).
+log "Patching config: enabling feature flags and replication gRPC service ..."
+GENERATED_CONFIG="${YDB_DATA_DIR}/cluster/kikimr_configs/config.yaml"
+PATCHED_CONFIG="/tmp/ydb-it-patched-config.yaml"
+cp "${GENERATED_CONFIG}" "${PATCHED_CONFIG}"
 
-# Add feature flags if not already present
-if ! grep -q 'enable_resource_pools' "${TMP_CONFIG}"; then
-    sed -i '/^feature_flags:/a\  enable_resource_pools: true\n  enable_external_data_sources: true\n  enable_streaming_queries: true' "${TMP_CONFIG}"
+if ! grep -q 'enable_resource_pools' "${PATCHED_CONFIG}"; then
+    sed -i '/^feature_flags:/a\  enable_resource_pools: true\n  enable_external_data_sources: true\n  enable_streaming_queries: true\n  enable_topic_transfer: true' "${PATCHED_CONFIG}"
+fi
+if ! grep -q '^\s*- replication' "${PATCHED_CONFIG}"; then
+    sed -i '/^  services:$/a\  - replication' "${PATCHED_CONFIG}"
 fi
 
-# Add grpc replication service if not already present
-if ! grep -q 'replication' "${TMP_CONFIG}"; then
-    sed -i '/^grpc_config:/,/^[^ ]/ { /services:/a\  - replication
-    }' "${TMP_CONFIG}"
-fi
+$RT rm -f "${YDB_CONTAINER}" >/dev/null 2>&1
+rm -rf "${YDB_DATA_DIR}"
+mkdir -p "${YDB_DATA_DIR}"
 
-$RT cp "${TMP_CONFIG}" "${YDB_CONTAINER}:${YDB_CONFIG_PATH}"
-rm -f "${TMP_CONFIG}"
+log "Restarting YDB with patched config ..."
+$RT run -d \
+    --name "${YDB_CONTAINER}" \
+    --network=host \
+    -v "${YDB_DATA_DIR}:/ydb_data" \
+    -v "${PATCHED_CONFIG}:/tmp/ydb-custom-config.yaml:ro" \
+    -e YDB_USE_IN_MEMORY_PDISKS=false \
+    -e YDB_PDISK_SIZE=68719476736 \
+    -e GRPC_PORT="${YDB_PORT}" \
+    "${YDB_IMAGE}" \
+    --config-path /tmp/ydb-custom-config.yaml >/dev/null
 
-# Restart the container so ydbd picks up the new config.
-$RT restart "${YDB_CONTAINER}"
 log "Waiting for YDB to restart with updated config ..."
 for i in $(seq 1 "${WAIT_TIMEOUT}"); do
-    if port_open "${YDB_PORT}"; then
+    if $RT exec "${YDB_CONTAINER}" /health_check >/dev/null 2>&1; then
         log "YDB restarted after ${i}s"
         break
     fi
