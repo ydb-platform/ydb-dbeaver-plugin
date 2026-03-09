@@ -9,7 +9,6 @@ import org.junit.jupiter.api.TestInstance;
 import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.abort;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class YDBTransferIT extends YDBBaseIT {
@@ -35,12 +34,6 @@ class YDBTransferIT extends YDBBaseIT {
                 "message: CAST($msg._data AS Utf8)" +
                 "|>]; }"
             );
-        } catch (Exception e) {
-            try (Statement cleanup = connection.createStatement()) {
-                try { cleanup.execute("DROP TOPIC it_transfer_src"); } catch (Exception ignored) {}
-                try { cleanup.execute("DROP TABLE it_transfer_dst"); } catch (Exception ignored) {}
-            }
-            abort("CREATE TRANSFER not supported in this YDB deployment: " + e.getMessage());
         }
     }
 
@@ -61,8 +54,7 @@ class YDBTransferIT extends YDBBaseIT {
     void testTransferViaDescribe() {
         YDBGrpcHelper.TransferInfo info =
             YDBGrpcHelper.describeTransfer(grpcTransport, prefixPath + "/it_test_transfer");
-        org.junit.jupiter.api.Assumptions.assumeTrue(info != null,
-            "describeTransfer RPC not available in this YDB deployment — skipping");
+        assertNotNull(info, "describeTransfer returned null — RPC may not be supported");
         assertNotNull(info.sourcePath, "Transfer source path should not be null");
         assertTrue(info.sourcePath.contains("it_transfer_src"),
             "Source path should reference topic it_transfer_src, but was: " + info.sourcePath);
