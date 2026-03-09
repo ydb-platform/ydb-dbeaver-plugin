@@ -1,5 +1,6 @@
 package org.jkiss.dbeaver.ext.ydb.it;
 
+import org.jkiss.dbeaver.ext.ydb.core.YDBStreamingQueryRow;
 import org.jkiss.dbeaver.ext.ydb.core.YDBSysQueries;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -7,12 +8,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -59,32 +57,22 @@ class YDBStreamingQueryIT extends YDBBaseIT {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(YDBSysQueries.STREAMING_QUERIES_QUERY)) {
 
-            // Build a column name → index map (same approach as YDBStreamingQueriesFolder)
-            ResultSetMetaData meta = rs.getMetaData();
-            Map<String, Integer> colMap = new HashMap<>();
-            for (int i = 1; i <= meta.getColumnCount(); i++) {
-                colMap.put(meta.getColumnName(i).toLowerCase(), i);
-            }
-            Integer pathIdx = colMap.get("path");
-            Integer statusIdx = colMap.get("status");
-            Integer textIdx = colMap.containsKey("text") ? colMap.get("text") : colMap.get("query_text");
+            List<YDBStreamingQueryRow> rows = YDBStreamingQueryRow.parseResultSet(rs);
+            YDBStreamingQueryRow found = rows.stream()
+                .filter(r -> r.path != null && r.path.contains("it_sq"))
+                .findFirst()
+                .orElse(null);
 
-            List<String> paths = new ArrayList<>();
-            while (rs.next()) {
-                String path = pathIdx != null ? rs.getString(pathIdx) : null;
-                paths.add(String.valueOf(path));
-                if (path != null && path.contains("it_sq")) {
-                    String status = statusIdx != null ? rs.getString(statusIdx) : null;
-                    String text = textIdx != null ? rs.getString(textIdx) : null;
-                    assertNotEquals("Failed", status,
-                        "Streaming query status should not be Failed");
-                    assertNotNull(text, "Streaming query text should not be null");
-                    assertTrue(text.contains("it_sq_src"),
-                        "Streaming query text should reference source topic it_sq_src, but was: " + text);
-                    return;
-                }
-            }
-            fail("No streaming query 'it_sq' found in .sys/streaming_queries. Found paths: " + paths);
+            List<String> paths = rows.stream()
+                .map(r -> String.valueOf(r.path))
+                .collect(Collectors.toList());
+            assertNotNull(found,
+                "No streaming query 'it_sq' found in .sys/streaming_queries. Found paths: " + paths);
+            assertNotEquals("Failed", found.status,
+                "Streaming query status should not be Failed");
+            assertNotNull(found.queryText, "Streaming query text should not be null");
+            assertTrue(found.queryText.contains("it_sq_src"),
+                "Streaming query text should reference source topic it_sq_src, but was: " + found.queryText);
         }
     }
 }

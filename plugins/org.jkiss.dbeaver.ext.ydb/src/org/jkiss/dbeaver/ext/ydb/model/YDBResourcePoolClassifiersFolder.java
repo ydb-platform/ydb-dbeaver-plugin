@@ -45,7 +45,8 @@ public class YDBResourcePoolClassifiersFolder implements DBSFolder, DBPRefreshab
 
     private static final Log log = Log.getLog(YDBResourcePoolClassifiersFolder.class);
 
-    private static final String RESOURCE_POOL_CLASSIFIERS_QUERY = "SELECT * FROM `.sys/resource_pool_classifiers`";
+    private static final String RESOURCE_POOL_CLASSIFIERS_QUERY =
+        org.jkiss.dbeaver.ext.ydb.core.YDBSysQueries.RESOURCE_POOL_CLASSIFIERS_QUERY;
 
     private final YDBDataSource dataSource;
     private List<YDBResourcePoolClassifier> classifiers;

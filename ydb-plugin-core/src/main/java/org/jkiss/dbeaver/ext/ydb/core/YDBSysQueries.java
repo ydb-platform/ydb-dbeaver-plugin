@@ -17,6 +17,11 @@ public final class YDBSysQueries {
         "QueryMemoryLimitPercentPerNode FROM `.sys/resource_pools`";
 
     /**
+     * Query to load all resource pool classifiers from the .sys/resource_pool_classifiers system view.
+     */
+    public static final String RESOURCE_POOL_CLASSIFIERS_QUERY = "SELECT * FROM `.sys/resource_pool_classifiers`";
+
+    /**
      * Query to load all active streaming queries from the .sys/streaming_queries system view.
      */
     public static final String STREAMING_QUERIES_QUERY = "SELECT * FROM `.sys/streaming_queries`";

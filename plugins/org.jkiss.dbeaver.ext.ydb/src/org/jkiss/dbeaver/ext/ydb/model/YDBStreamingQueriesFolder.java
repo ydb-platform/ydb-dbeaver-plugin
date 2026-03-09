@@ -30,12 +30,12 @@ import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.dbeaver.model.struct.DBSFolder;
 import org.jkiss.dbeaver.model.struct.DBSObject;
 
-import java.sql.ResultSetMetaData;
+import org.jkiss.dbeaver.ext.ydb.core.YDBStreamingQueryRow;
+
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -140,72 +140,20 @@ public class YDBStreamingQueriesFolder implements DBSFolder, DBPRefreshableObjec
             try (JDBCSession session = DBUtils.openMetaSession(monitor, dataSource, "Load streaming queries")) {
                 try (JDBCPreparedStatement stmt = session.prepareStatement(STREAMING_QUERIES_QUERY)) {
                     try (JDBCResultSet rs = stmt.executeQuery()) {
-                        // Get column metadata to find query_text and metadata columns
-                        ResultSetMetaData metaData = rs.getOriginal().getMetaData();
-                        int columnCount = metaData.getColumnCount();
-
-                        // Build column name to index mapping
-                        Map<String, Integer> columnMap = new HashMap<>();
-                        for (int i = 1; i <= columnCount; i++) {
-                            String columnName = metaData.getColumnName(i).toLowerCase();
-                            columnMap.put(columnName, i);
-                        }
-
-                        log.debug("Streaming queries columns: " + columnMap.keySet());
-
-                        // Find relevant column indices
-                        Integer pathIndex = findColumnIndex(columnMap, "Path");
-                        Integer statusIndex = findColumnIndex(columnMap, "Status");
-                        Integer issuesIndex = findColumnIndex(columnMap, "Issues");
-                        Integer planIndex = findColumnIndex(columnMap, "Plan");
-                        Integer astIndex = findColumnIndex(columnMap, "Ast");
-                        Integer queryTextIndex = findColumnIndex(columnMap, "Text", "query_text", "query");
-                        Integer runIndex = findColumnIndex(columnMap, "Run");
-                        Integer resourcePoolIndex = findColumnIndex(columnMap, "ResourcePool");
-                        Integer retryCountIndex = findColumnIndex(columnMap, "RetryCount");
-                        Integer lastFailAtIndex = findColumnIndex(columnMap, "LastFailAt");
-                        Integer suspendedUntilIndex = findColumnIndex(columnMap, "SuspendedUntil");
-
-                        // If we don't have Path column, use first column
-                        if (pathIndex == null && columnCount > 0) {
-                            pathIndex = 1;
-                        }
-
-                        int rowNum = 0;
-                        while (rs.next()) {
-                            rowNum++;
-
-                            // Get Path (or generate one if not available)
-                            String path = null;
-                            if (pathIndex != null) {
-                                path = rs.getString(pathIndex);
-                            }
-                            if (path == null || path.isEmpty()) {
-                                path = "Query #" + rowNum;
-                            }
-
-                            // Get all column values
-                            String status = statusIndex != null ? rs.getString(statusIndex) : null;
-                            String issues = issuesIndex != null ? rs.getString(issuesIndex) : null;
-                            String plan = planIndex != null ? rs.getString(planIndex) : null;
-                            String ast = astIndex != null ? rs.getString(astIndex) : null;
-                            String queryText = queryTextIndex != null ? rs.getString(queryTextIndex) : null;
-                            String run = runIndex != null ? rs.getString(runIndex) : null;
-                            String resourcePool = resourcePoolIndex != null ? rs.getString(resourcePoolIndex) : null;
-                            String retryCount = retryCountIndex != null ? rs.getString(retryCountIndex) : null;
-                            String lastFailAt = lastFailAtIndex != null ? rs.getString(lastFailAtIndex) : null;
-                            String suspendedUntil = suspendedUntilIndex != null ? rs.getString(suspendedUntilIndex) : null;
-
-                            String relativePath = stripDatabasePrefix(path);
+                        List<YDBStreamingQueryRow> rows =
+                            YDBStreamingQueryRow.parseResultSet(rs.getOriginal());
+                        for (YDBStreamingQueryRow row : rows) {
+                            String relativePath = stripDatabasePrefix(row.path);
                             if (relativePath.isEmpty()) {
-                                relativePath = path;
+                                relativePath = row.path;
                             }
                             allQueries.add(new YDBStreamingQuery(
                                 dataSource, relativePath, relativePath,
-                                status, issues, plan, ast, queryText,
-                                run, resourcePool, retryCount, lastFailAt, suspendedUntil
+                                row.status, row.issues, row.plan, row.ast, row.queryText,
+                                row.run, row.resourcePool, row.retryCount,
+                                row.lastFailAt, row.suspendedUntil
                             ));
-                            log.debug("Added streaming query: " + path);
+                            log.debug("Added streaming query: " + row.path);
                         }
                     }
                 }
@@ -310,19 +258,6 @@ public class YDBStreamingQueriesFolder implements DBSFolder, DBPRefreshableObjec
 
         // Sort root queries
         rootQueries.sort(Comparator.comparing(YDBStreamingQuery::getName, String.CASE_INSENSITIVE_ORDER));
-    }
-
-    /**
-     * Find column index by trying multiple possible column names.
-     */
-    private Integer findColumnIndex(Map<String, Integer> columnMap, String... possibleNames) {
-        for (String name : possibleNames) {
-            Integer index = columnMap.get(name.toLowerCase());
-            if (index != null) {
-                return index;
-            }
-        }
-        return null;
     }
 
     @Override

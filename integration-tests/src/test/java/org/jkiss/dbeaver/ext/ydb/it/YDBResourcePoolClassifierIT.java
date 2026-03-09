@@ -1,5 +1,6 @@
 package org.jkiss.dbeaver.ext.ydb.it;
 
+import org.jkiss.dbeaver.ext.ydb.core.YDBSysQueries;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class YDBResourcePoolClassifierIT extends YDBBaseIT {
     void testClassifierProperties() throws Exception {
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(
-                "SELECT * FROM `.sys/resource_pool_classifiers` WHERE Name = 'it_test_classifier'")) {
+                YDBSysQueries.RESOURCE_POOL_CLASSIFIERS_QUERY + " WHERE Name = 'it_test_classifier'")) {
             assertTrue(rs.next(), "Classifier it_test_classifier should appear in .sys/resource_pool_classifiers");
             assertEquals("it_test_classifier", rs.getString("Name"));
             assertEquals(1000, rs.getInt("Rank"));
