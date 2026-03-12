@@ -4,18 +4,34 @@
 
 ## Table of Contents
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Build from source](#build-from-source)
-- [Installation](#installation)
-  - [Method 1: install from ZIP archive (P2 repository)](#method-1-install-from-zip-archive-p2-repository)
-  - [Method 2: install from URL (recommended)](#method-2-install-from-url-recommended)
-- [Creating a YDB connection](#creating-a-ydb-connection)
-- [Authentication methods](#authentication-methods)
-- [Object navigator](#object-navigator)
-- [Plugin capabilities](#plugin-capabilities)
-- [Updates](#updates)
-- [License](#license)
+- [YDB DBeaver Plugin](#ydb-dbeaver-plugin)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Requirements](#requirements)
+  - [Build from source](#build-from-source)
+  - [Installation](#installation)
+    - [Method 1: install from ZIP archive (P2 repository)](#method-1-install-from-zip-archive-p2-repository)
+    - [Method 2: install from URL (recommended)](#method-2-install-from-url-recommended)
+  - [Creating a YDB connection](#creating-a-ydb-connection)
+  - [Authentication methods](#authentication-methods)
+    - [Anonymous](#anonymous)
+    - [Static (username and password)](#static-username-and-password)
+    - [Token](#token)
+    - [Service Account](#service-account)
+    - [Metadata](#metadata)
+  - [Object navigator](#object-navigator)
+  - [Plugin capabilities](#plugin-capabilities)
+    - [YQL editor](#yql-editor)
+    - [EXPLAIN and execution plan](#explain-and-execution-plan)
+    - [Session manager](#session-manager)
+    - [Cluster dashboard](#cluster-dashboard)
+    - [Access rights (ACL)](#access-rights-acl)
+    - [Streaming queries](#streaming-queries)
+    - [Creating objects](#creating-objects)
+  - [Updates](#updates)
+    - [URL installation — automatic updates work](#url-installation--automatic-updates-work)
+    - [ZIP installation — automatic updates do **not** work](#zip-installation--automatic-updates-do-not-work)
+  - [License](#license)
 
 ---
 
@@ -74,139 +90,23 @@ mvn clean verify
 
 Use this method to install from a locally built or downloaded archive.
 
-**Step 1.** Open DBeaver. In the top menu select:
-
-```
-Help → Install New Software...
-```
-
-The Install dialog opens.
-
----
+**Step 1.** Open DBeaver. In the top menu select **Help → Install New Software...**
 
 **Step 2.** Click **Add...** next to the "Work with:" field.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Install                                                 │
-│                                                         │
-│ Work with: [________________________] [Add...] [Manage] │
-│                                                         │
-│ type filter text                                        │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ (empty — no repository selected)                    │ │
-│ └─────────────────────────────────────────────────────┘ │
-│                          [< Back] [Next >] [Cancel]     │
-└─────────────────────────────────────────────────────────┘
-```
+**Step 3.** In the "Add Repository" dialog click **Archive...**, select the ZIP file `org.jkiss.dbeaver.ext.ydb.repository-1.0.0-SNAPSHOT.zip`, enter a name (e.g. `YDB Plugin`), and click **Add**. DBeaver loads the archive contents.
 
----
+**Step 4.** The category **DBeaver YDB Support** appears in the list. Check it and click **Next >**.
 
-**Step 3.** In the "Add Repository" dialog click **Archive...** and select the ZIP file:
+**Step 5.** On the "Install Details" screen verify that both components are listed (`org.jkiss.dbeaver.ext.ydb` and `org.jkiss.dbeaver.ext.ydb.ui`) and click **Next >**.
 
-```
-┌─────────────────────────────────────────┐
-│ Add Repository                          │
-│                                         │
-│ Name: [YDB Plugin                     ] │
-│                                         │
-│ Location: [jar:file:/path/to/...zip!/]  │
-│           [Local...] [Archive...]       │
-│                          [Add] [Cancel] │
-└─────────────────────────────────────────┘
-```
-
-Select `org.jkiss.dbeaver.ext.ydb.repository-1.0.0-SNAPSHOT.zip`.
-
-After clicking **Add**, DBeaver loads the archive contents.
-
----
-
-**Step 4.** The category **DBeaver YDB Support** appears. Check it:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ Work with: YDB Plugin - jar:file:/path/to/...zip!/      │
-│                                                         │
-│ ☑ DBeaver YDB Support                                   │
-│   ☑ DBeaver YDB Support 1.0.0                           │
-│                                                         │
-│ ☐ Show only the latest versions of available software   │
-│ ☑ Group items by category                               │
-│                          [< Back] [Next >] [Cancel]     │
-└─────────────────────────────────────────────────────────┘
-```
-
-Click **Next >**.
-
----
-
-**Step 5.** On the "Install Details" screen verify both components are listed:
-
-```
-Items to install:
-• org.jkiss.dbeaver.ext.ydb  1.0.0
-• org.jkiss.dbeaver.ext.ydb.ui  1.0.0
-```
-
-Click **Next >**.
-
----
-
-**Step 6.** DBeaver may show an unsigned content warning:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Warning: Unsigned Content                                   │
-│                                                             │
-│ The following content is unsigned:                          │
-│   - DBeaver YDB Support 1.0.0                               │
-│                                                             │
-│ If you proceed, you are putting the authenticity or         │
-│ validity of this software at risk.                          │
-│                                                             │
-│                     [Install Anyway] [Cancel]               │
-└─────────────────────────────────────────────────────────────┘
-```
-
-This is expected — the plugin JARs are not signed with a commercial certificate. Click **Install Anyway**.
+**Step 6.** DBeaver may show an unsigned content warning. This is expected — the plugin JARs are not signed with a commercial certificate. Click **Install Anyway**.
 
 > Eclipse (which DBeaver is based on) verifies JAR signatures to confirm authenticity. This open source plugin is distributed without a signature. The source code is available for review in this repository.
 
----
-
 **Step 7.** Review the license (Apache License 2.0), select **I accept the terms of the license agreements**, and click **Finish**.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Review Licenses                                         │
-│                                                         │
-│ Licenses:                                               │
-│ Apache License, Version 2.0                             │
-│                                                         │
-│ ○ I do not accept the terms of the license agreements   │
-│ ● I accept the terms of the license agreements          │
-│                          [< Back] [Finish] [Cancel]     │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-**Step 8.** DBeaver installs the plugin and prompts for a restart. Click **Restart Now**.
-
-```
-┌─────────────────────────┐
-│ Software Updates        │
-│                         │
-│ A restart is required   │
-│ to apply the software   │
-│ updates. Restart now?   │
-│                         │
-│ [Restart Now] [Not Now] │
-└─────────────────────────┘
-```
-
-After restart the plugin is active.
+**Step 8.** DBeaver installs the plugin and prompts for a restart. Click **Restart Now**. After restart the plugin is active.
 
 ---
 
@@ -216,23 +116,10 @@ This method enables automatic updates.
 
 **Steps 1–2.** Same as Method 1: open **Help → Install New Software...** and click **Add...**.
 
-**Step 3.** In the "Add Repository" dialog enter the URL in the **Location** field:
+**Step 3.** In the "Add Repository" dialog enter a name (e.g. `YDB Plugin`) and paste the following URL into the **Location** field:
 
 ```
 https://storage.yandexcloud.net/ydb-dbeaver-plugin
-```
-
-```
-┌─────────────────────────────────────────┐
-│ Add Repository                          │
-│                                         │
-│ Name: [YDB Plugin                     ] │
-│                                         │
-│ Location: [https://storage.yandexcloud. │
-│            net/ydb-dbeaver-plugin    ]  │
-│           [Local...] [Archive...]       │
-│                          [Add] [Cancel] │
-└─────────────────────────────────────────┘
 ```
 
 Click **Add**. DBeaver loads the repository metadata.
@@ -245,77 +132,22 @@ Click **Add**. DBeaver loads the repository metadata.
 
 **Step 1.** In the top menu select **Database → New Database Connection** (or press `Ctrl+Shift+N`).
 
----
-
 **Step 2.** Type `YDB` in the search box. Select **YDB** from the list and click **Next**.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ Connect to a database                                   │
-│                                                         │
-│ [YDB                                     ] ← search     │
-│                                                         │
-│ ┌─────────────────┐                                     │
-│ │  [YDB logo]     │                                     │
-│ │  YDB            │                                     │
-│ └─────────────────┘                                     │
-│                          [< Back] [Next >] [Cancel]     │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-**Step 3.** The YDB connection settings page opens:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Connection Settings                                         │
-│                                                             │
-│ ┌ Connection ─────────────────────────────────────────────┐ │
-│ │ Host:     [localhost           ]  Port: [2135]          │ │
-│ │ Database: [/local              ]                        │ │
-│ │ Monitoring URL: [              ]                        │ │
-│ │ ☑ Use secure connection (grpcs://)                      │ │
-│ │ ☑ Enable autocomplete API                               │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                             │
-│ ┌ Authentication ─────────────────────────────────────────┐ │
-│ │ Auth type: [Anonymous ▼]                                │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                             │
-│ JDBC URL: jdbc:ydb:grpcs://localhost:2135/local            │
-│                                                             │
-│ [Test Connection]        [< Back] [Next >] [Finish]        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-Fill in the fields:
+**Step 3.** The YDB connection settings page opens. Fill in the fields:
 
 | Field | Description | Example |
 |-------|-------------|---------|
 | **Host** | YDB server host | `ydb.example.com` |
 | **Port** | Port (default 2135) | `2135` |
-| **Database** | Database path | `/ru-central1/b1gxxx/etn000` |
-| **Monitoring URL** | YDB Viewer API URL for the dashboard (optional) | `http://ydb-viewer:8765` |
+| **Database** | Database path | `/Root/database` |
+| **Monitoring URL** | YDB Viewer API URL for the dashboard (optional) | `http://ydb.example.com:8765` |
 | **Use secure connection** | Enable TLS/SSL (`grpcs://`) | ☑ |
 | **Enable autocomplete API** | Autocomplete via YDB API | ☑ |
 
----
-
 **Step 4.** Select the authentication method from the **Auth type** dropdown (see [Authentication methods](#authentication-methods)).
 
----
-
-**Step 5.** Click **Test Connection**. On success:
-
-```
-┌─────────────────────────┐
-│ Connected (42 ms)       │
-│              [OK]       │
-└─────────────────────────┘
-```
-
----
+**Step 5.** Click **Test Connection**. On success a dialog appears showing the connection time in milliseconds.
 
 **Step 6.** Click **Finish**. The connection appears in the **Database Navigator** panel.
 
@@ -325,53 +157,25 @@ Fill in the fields:
 
 ### Anonymous
 
-Connect without credentials. Use for local or test YDB installations.
-
-```
-Auth type: [Anonymous ▼]
-```
-
-No additional fields.
+Connect without credentials. Use for local or test YDB installations. Select **Anonymous** from the **Auth type** dropdown. No additional fields are required.
 
 ---
 
 ### Static (username and password)
 
-```
-Auth type: [Static ▼]
-┌────────────────────────────────┐
-│ User:     [username          ] │
-│ Password: [••••••••          ] │
-└────────────────────────────────┘
-```
-
-Use when username/password authentication is enabled on the YDB server.
+Select **Static** from the **Auth type** dropdown. Enter the username in the **User** field and the password in the **Password** field. Use when username/password authentication is enabled on the YDB server.
 
 ---
 
 ### Token
 
-```
-Auth type: [Token ▼]
-┌────────────────────────────────────────────────┐
-│ Token: [••••••••••••••••••••••••••••••••••••] │
-└────────────────────────────────────────────────┘
-```
-
-Enter an IAM token or OAuth token. The token is sent in the header of every request.
+Select **Token** from the **Auth type** dropdown. Enter an IAM token or OAuth token in the **Token** field. The token is sent in the header of every request.
 
 ---
 
 ### Service Account
 
-```
-Auth type: [Service Account ▼]
-┌──────────────────────────────────────────────┐
-│ SA Key File: [/path/to/key.json    ] [...]   │
-└──────────────────────────────────────────────┘
-```
-
-Provide the path to a Yandex Cloud service account JSON key file. The `...` button opens a file picker.
+Select **Service Account** from the **Auth type** dropdown. Provide the path to a Yandex Cloud [service account](https://yandex.cloud/en/docs/iam/concepts/users/service-accounts) JSON key file in the **SA Key File** field (use the **...** button to open a file picker). See [how to create an authorized key](https://yandex.cloud/en/docs/iam/operations/authentication/manage-authorized-keys) in the Yandex Cloud documentation.
 
 The key file format:
 ```json
@@ -386,42 +190,21 @@ The key file format:
 
 ### Metadata
 
-```
-Auth type: [Metadata ▼]
-```
-
-The plugin fetches an IAM token from the Yandex Cloud VM metadata service. Use only when DBeaver runs on a Yandex Cloud virtual machine.
+Select **Metadata** from the **Auth type** dropdown. The plugin fetches an IAM token from the [Yandex Cloud VM metadata service](https://yandex.cloud/en/docs/compute/operations/vm-metadata/get-vm-metadata). Use only when DBeaver runs on a Yandex Cloud virtual machine.
 
 ---
 
 ## Object navigator
 
-After connecting, the **Database Navigator** panel shows the YDB object hierarchy:
+After connecting, the **Database Navigator** panel shows the YDB object hierarchy. The root node is the connection, inside it is the database path, which contains the following folders:
 
-```
-▼ YDB Connection
-  ▼ /local
-    ▼ Tables
-      ▼ folder1
-        ▷ subfolder
-        📋 mytable
-      📋 anothertable
-    ▼ Topics
-      📨 my-topic
-    ▼ Views
-      👁 my-view
-    ▼ External Data Sources
-      🔗 s3-source
-    ▼ External Tables
-      📋 ext-table
-    ▼ System Views (.sys)
-      📋 partition_stats
-      📋 query_sessions
-    ▼ Resource Pools
-      ⚙ default
-```
-
-Tables are organized into folders according to their YDB path (e.g. table `/local/folder1/subfolder/mytable` appears nested under `folder1 → subfolder`).
+- **Tables** — organized into subfolders according to the YDB path (e.g. a table at `folder1/subfolder/mytable` appears nested under `folder1 → subfolder`)
+- **Topics**
+- **Views**
+- **External Data Sources**
+- **External Tables**
+- **System Views (.sys)** — system views such as `partition_stats`, `query_sessions`
+- **Resource Pools**
 
 ---
 
@@ -437,7 +220,7 @@ Open the **SQL Editor** (`F3` or double-click the connection). The editor suppor
 
 ```sql
 -- Example YQL query
-UPSERT INTO `/local/users` (id, name, created_at)
+UPSERT INTO `users` (id, name, created_at)
 VALUES (1, "Alice", CurrentUtcDatetime());
 ```
 
@@ -457,18 +240,7 @@ Click **Explain** (or `Ctrl+Shift+E`) to get the execution plan. The plugin show
 
 ### Session manager
 
-Right-click the connection and select **Manage Sessions**, or use **Database → Manage Sessions**.
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Active Sessions                          [Hide Idle] ☑  │
-├──────────┬──────────────────┬──────────────┬────────────┤
-│ Session  │ Query            │ State        │ Duration   │
-├──────────┼──────────────────┼──────────────┼────────────┤
-│ abc123   │ SELECT * FROM …  │ Executing    │ 00:00:03   │
-│ def456   │ —                │ Idle         │ 00:02:15   │
-└──────────┴──────────────────┴──────────────┴────────────┘
-```
+Right-click the connection and select **Manage Sessions**, or use **Database → Manage Sessions**. The view lists all active sessions with their current query, state, and duration. The **Hide Idle** checkbox filters out sessions that have no active query.
 
 ---
 
@@ -488,31 +260,18 @@ The dashboard shows in real time (refreshes every 5 seconds):
 
 ### Access rights (ACL)
 
-Right-click an object (table, topic, folder, etc.) → **Edit Permissions**.
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Permissions for /local/users                            │
-├──────────────────────┬─────────────────────────────────┤
-│ Subject              │ Permissions                     │
-├──────────────────────┼─────────────────────────────────┤
-│ user@example.com     │ SELECT, INSERT                  │
-│ service-account@...  │ FULL                            │
-└──────────────────────┴─────────────────────────────────┘
-│ [Grant] [Revoke] [Set Owner]                           │
-└──────────────────────────────────────────────────────────┘
-```
+Right-click an object (table, topic, folder, etc.) → **Edit Permissions**. The dialog lists all subjects (users, service accounts) and their permissions. Use the **Grant**, **Revoke**, and **Set Owner** buttons to manage access.
 
 ---
 
 ### Streaming queries
 
-In the navigator expand the **Streaming Queries** folder. For each query:
+In the navigator expand the **Streaming Queries** folder. For each query you can:
 
 - View source (YQL)
 - View issues
 - View execution plan
-- Actions: **Start**, **Stop**, **Alter**
+- Perform actions: **Start**, **Stop**, **Alter**
 
 ---
 
@@ -534,25 +293,12 @@ Each new build automatically gets a unique version like `1.0.0.v20260302-1652` (
 
 ### URL installation — automatic updates work
 
-If the plugin was installed via **Help → Install New Software → Add → URL** `https://storage.yandexcloud.net/ydb-dbeaver-plugin` (Method 2), DBeaver remembers that URL. Publishing a new repository at the same URL is enough:
+If the plugin was installed via **Help → Install New Software → Add → URL** `https://storage.yandexcloud.net/ydb-dbeaver-plugin` (Method 2), DBeaver remembers that URL. Publishing a new repository at the same URL is enough.
 
 Users receive the update:
 
 1. Automatically on the next DBeaver start (if update checks are enabled — **Window → Preferences → Install/Update → Automatic Updates**)
-2. Manually via **Help → Check for Updates**:
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Available Updates                                            │
-│                                                              │
-│ ☑ DBeaver YDB Support  1.0.0.v20260302-1652 → 1.0.0.v202604… │
-│                                                              │
-│                             [Select All] [Deselect All]      │
-│                              [< Back] [Next >] [Cancel]      │
-└──────────────────────────────────────────────────────────────┘
-```
-
-After selecting the update DBeaver follows the same steps as the first install (license → unsigned warning → restart).
+2. Manually via **Help → Check for Updates**: select the available update and follow the same steps as the first install (license → unsigned warning → restart)
 
 ### ZIP installation — automatic updates do **not** work
 
