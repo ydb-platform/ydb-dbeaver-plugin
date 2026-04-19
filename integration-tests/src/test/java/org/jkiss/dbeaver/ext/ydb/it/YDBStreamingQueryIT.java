@@ -109,6 +109,6 @@ class YDBStreamingQueryIT extends YDBBaseIT {
             return false;
         }
         String s = status.toLowerCase();
-        return s.contains("error") || s.contains("failed");
+        return s.contains("error") || s.contains("failed") || s.contains("suspended");
     }
 }

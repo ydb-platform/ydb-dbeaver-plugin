@@ -183,14 +183,14 @@ public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScript
 
     /**
      * Whether the streaming query is in an error state.
-     * Detected by status containing "error" or "failed" (case-insensitive).
+     * Detected by status containing "error", "failed" or "suspended" (case-insensitive).
      */
     public boolean isInErrorState() {
         if (status == null) {
             return false;
         }
         String s = status.toLowerCase();
-        return s.contains("error") || s.contains("failed");
+        return s.contains("error") || s.contains("failed") || s.contains("suspended");
     }
 
     @Nullable

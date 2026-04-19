@@ -244,6 +244,16 @@ public class YDBStreamingQueryTest {
     }
 
     @Test
+    public void testIsInErrorStateTrueForSuspended() {
+        assertTrue(createQuery("q", "q", "SUSPENDED").isInErrorState());
+    }
+
+    @Test
+    public void testIsInErrorStateTrueForMixedCaseSuspended() {
+        assertTrue(createQuery("q", "q", "Suspended").isInErrorState());
+    }
+
+    @Test
     public void testIsInErrorStateFalseForRunning() {
         assertFalse(createQuery("q", "q", "RUNNING").isInErrorState());
     }
