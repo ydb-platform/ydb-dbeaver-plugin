@@ -75,4 +75,40 @@ class YDBStreamingQueryIT extends YDBBaseIT {
                 "Streaming query text should reference source topic it_sq_src, but was: " + found.queryText);
         }
     }
+
+    /**
+     * Verifies the raw data behind the navigator error-icon overlay:
+     * the .sys/streaming_queries status column is populated, and for a healthy
+     * (non-failed) query it must NOT match the rule used by
+     * YDBStreamingQuery.isInErrorState().
+     */
+    @Test
+    void testHealthyStreamingQueryStatusDoesNotTriggerErrorIcon() throws Exception {
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery(YDBSysQueries.STREAMING_QUERIES_QUERY)) {
+
+            List<YDBStreamingQueryRow> rows = YDBStreamingQueryRow.parseResultSet(rs);
+            YDBStreamingQueryRow found = rows.stream()
+                .filter(r -> r.path != null && r.path.contains("it_sq"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("it_sq not found"));
+
+            assertNotNull(found.status,
+                "Streaming query status should be populated (required by error-icon overlay)");
+            assertFalse(isErrorStatus(found.status),
+                "Healthy streaming query should not be in error state, but status=" + found.status);
+        }
+    }
+
+    /**
+     * Mirrors the rule in YDBStreamingQuery.isInErrorState() — kept here so the IT
+     * validates real YDB status values against the same predicate used by the UI.
+     */
+    private static boolean isErrorStatus(String status) {
+        if (status == null) {
+            return false;
+        }
+        String s = status.toLowerCase();
+        return s.contains("error") || s.contains("failed");
+    }
 }

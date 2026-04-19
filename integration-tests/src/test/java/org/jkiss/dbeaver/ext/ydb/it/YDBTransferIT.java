@@ -62,4 +62,27 @@ class YDBTransferIT extends YDBBaseIT {
         assertTrue(info.destinationPath.contains("it_transfer_dst"),
             "Destination path should reference table it_transfer_dst, but was: " + info.destinationPath);
     }
+
+    /**
+     * Verifies the raw data behind the navigator error-icon overlay:
+     * describeTransfer returns a non-null state, and for a healthy transfer
+     * it must NOT match the "Error" rule used by YDBTransfer.isInErrorState().
+     */
+    @Test
+    void testHealthyTransferStateDoesNotTriggerErrorIcon() {
+        YDBGrpcHelper.TransferInfo info =
+            YDBGrpcHelper.describeTransfer(grpcTransport, prefixPath + "/it_test_transfer");
+        assertNotNull(info, "describeTransfer returned null");
+        assertNotNull(info.state, "Transfer state should be populated (required by error-icon overlay)");
+        assertFalse(isErrorState(info.state),
+            "Healthy transfer should not be in error state, but state=" + info.state);
+    }
+
+    /**
+     * Mirrors the rule in YDBTransfer.isInErrorState() — kept here so the IT
+     * validates real YDB state values against the same predicate used by the UI.
+     */
+    private static boolean isErrorState(String state) {
+        return state != null && "error".equalsIgnoreCase(state);
+    }
 }

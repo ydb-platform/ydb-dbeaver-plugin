@@ -18,7 +18,11 @@ package org.jkiss.dbeaver.ext.ydb.model;
 
 import org.jkiss.code.NotNull;
 import org.jkiss.code.Nullable;
+import org.jkiss.dbeaver.model.DBIcon;
+import org.jkiss.dbeaver.model.DBIconComposite;
 import org.jkiss.dbeaver.model.DBPDataSource;
+import org.jkiss.dbeaver.model.DBPImage;
+import org.jkiss.dbeaver.model.DBPImageProvider;
 import org.jkiss.dbeaver.model.DBPScriptObject;
 import org.jkiss.dbeaver.model.DBPToolTipObject;
 import org.jkiss.dbeaver.model.meta.Property;
@@ -32,7 +36,7 @@ import java.util.Map;
  * Represents an active streaming query from .sys/streaming_queries system view.
  * The Path field contains a hierarchical path (e.g. "folder/subfolder/query_name").
  */
-public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScriptObject {
+public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScriptObject, DBPImageProvider {
 
     private final DBSObject parent;
     private final String name;
@@ -171,6 +175,27 @@ public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScript
     @Nullable
     @Override
     public String getDescription() {
+        return null;
+    }
+
+    /**
+     * Whether the streaming query is in an error state.
+     * Detected by status containing "error" or "failed" (case-insensitive).
+     */
+    public boolean isInErrorState() {
+        if (status == null) {
+            return false;
+        }
+        String s = status.toLowerCase();
+        return s.contains("error") || s.contains("failed");
+    }
+
+    @Nullable
+    @Override
+    public DBPImage getObjectImage() {
+        if (isInErrorState()) {
+            return new DBIconComposite(DBIcon.SQL_TEXT, false, null, null, null, DBIcon.OVER_ERROR);
+        }
         return null;
     }
 
