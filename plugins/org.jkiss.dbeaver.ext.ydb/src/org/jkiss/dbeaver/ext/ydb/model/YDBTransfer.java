@@ -20,7 +20,11 @@ import org.jkiss.code.NotNull;
 import org.jkiss.code.Nullable;
 import org.jkiss.dbeaver.DBException;
 import org.jkiss.dbeaver.Log;
+import org.jkiss.dbeaver.model.DBIcon;
+import org.jkiss.dbeaver.model.DBIconComposite;
 import org.jkiss.dbeaver.model.DBPDataSource;
+import org.jkiss.dbeaver.model.DBPImage;
+import org.jkiss.dbeaver.model.DBPImageProvider;
 import org.jkiss.dbeaver.model.DBPRefreshableObject;
 import org.jkiss.dbeaver.model.DBPScriptObject;
 import org.jkiss.dbeaver.model.DBUtils;
@@ -44,7 +48,7 @@ import java.util.Map;
 /**
  * YDB Transfer object for data replication between databases.
  */
-public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptObject, YDBPermissionHolder {
+public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptObject, DBPImageProvider, YDBPermissionHolder {
 
     private static final Log log = Log.getLog(YDBTransfer.class);
 
@@ -169,6 +173,23 @@ public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptOb
     @Property(viewable = true, order = 6)
     public String getState() {
         return state;
+    }
+
+    /**
+     * Whether the transfer is in an error state.
+     * Reflects the last loaded state; if properties have not been loaded yet, returns false.
+     */
+    public boolean isInErrorState() {
+        return state != null && "error".equalsIgnoreCase(state);
+    }
+
+    @Nullable
+    @Override
+    public DBPImage getObjectImage() {
+        if (isInErrorState()) {
+            return new DBIconComposite(DBIcon.TREE_TABLE, false, null, null, null, DBIcon.OVER_ERROR);
+        }
+        return null;
     }
 
     @Nullable

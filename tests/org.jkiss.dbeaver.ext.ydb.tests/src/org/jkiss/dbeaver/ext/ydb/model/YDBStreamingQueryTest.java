@@ -16,7 +16,10 @@
  */
 package org.jkiss.dbeaver.ext.ydb.model;
 
+import org.jkiss.dbeaver.model.DBIcon;
+import org.jkiss.dbeaver.model.DBIconComposite;
 import org.jkiss.dbeaver.model.DBPDataSource;
+import org.jkiss.dbeaver.model.DBPImage;
 import org.jkiss.dbeaver.model.struct.DBSObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -221,5 +224,55 @@ public class YDBStreamingQueryTest {
         assertEquals("3", copy.getRetryCount());
         assertEquals("2026-01-01", copy.getLastFailAt());
         assertEquals("2026-02-01", copy.getSuspendedUntil());
+    }
+
+    // Error state / icon tests
+
+    @Test
+    public void testIsInErrorStateTrueForError() {
+        assertTrue(createQuery("q", "q", "ERROR").isInErrorState());
+    }
+
+    @Test
+    public void testIsInErrorStateTrueForLowerCaseFailed() {
+        assertTrue(createQuery("q", "q", "failed").isInErrorState());
+    }
+
+    @Test
+    public void testIsInErrorStateTrueForMixedCaseFailed() {
+        assertTrue(createQuery("q", "q", "Failed").isInErrorState());
+    }
+
+    @Test
+    public void testIsInErrorStateFalseForRunning() {
+        assertFalse(createQuery("q", "q", "RUNNING").isInErrorState());
+    }
+
+    @Test
+    public void testIsInErrorStateFalseForStopped() {
+        assertFalse(createQuery("q", "q", "STOPPED").isInErrorState());
+    }
+
+    @Test
+    public void testIsInErrorStateFalseForNullStatus() {
+        YDBStreamingQuery q = new YDBStreamingQuery(
+            mockParent, "q", "q", null, null, null, null, null, null, null, null, null, null
+        );
+        assertFalse(q.isInErrorState());
+    }
+
+    @Test
+    public void testGetObjectImageReturnsNullWhenHealthy() {
+        assertNull(createQuery("q", "q", "RUNNING").getObjectImage());
+    }
+
+    @Test
+    public void testGetObjectImageReturnsCompositeWithErrorOverlayWhenFailed() {
+        DBPImage img = createQuery("q", "q", "ERROR").getObjectImage();
+        assertNotNull(img);
+        assertTrue(img instanceof DBIconComposite);
+        DBIconComposite composite = (DBIconComposite) img;
+        assertSame(DBIcon.SQL_TEXT, composite.getMain());
+        assertSame(DBIcon.OVER_ERROR, composite.getBottomRight());
     }
 }
