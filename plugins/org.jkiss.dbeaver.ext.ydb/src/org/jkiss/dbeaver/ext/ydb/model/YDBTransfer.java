@@ -52,6 +52,9 @@ public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptOb
 
     private static final Log log = Log.getLog(YDBTransfer.class);
 
+    public static final DBIcon ICON = new DBIcon(
+        "platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/transfer.svg");
+
     private final DBSObject parent;
     private final String name;
     private final String fullPath;
@@ -187,7 +190,7 @@ public class YDBTransfer implements DBSObject, DBPRefreshableObject, DBPScriptOb
     @Override
     public DBPImage getObjectImage() {
         if (isInErrorState()) {
-            return new DBIconComposite(DBIcon.TREE_TABLE, false, null, null, null, DBIcon.OVER_ERROR);
+            return new DBIconComposite(ICON, false, null, null, null, DBIcon.OVER_ERROR);
         }
         return null;
     }

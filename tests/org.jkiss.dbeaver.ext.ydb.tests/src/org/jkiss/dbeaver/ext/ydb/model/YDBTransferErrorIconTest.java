@@ -114,7 +114,7 @@ public class YDBTransferErrorIconTest {
         assertNotNull(img);
         assertTrue(img instanceof DBIconComposite);
         DBIconComposite composite = (DBIconComposite) img;
-        assertSame(DBIcon.TREE_TABLE, composite.getMain());
+        assertSame(YDBTransfer.ICON, composite.getMain());
         assertSame(DBIcon.OVER_ERROR, composite.getBottomRight());
     }
 }

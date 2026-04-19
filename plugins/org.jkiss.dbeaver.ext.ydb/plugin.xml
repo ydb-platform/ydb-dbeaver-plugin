@@ -62,10 +62,10 @@
                         <!-- Nested subfolders (recursive) -->
                         <items label="%tree.topic_folder.node.name" path="topicSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
                         <!-- Topics inside folder -->
-                        <items label="%tree.topic.node.name" path="topic" property="topics" icon="#table"/>
+                        <items label="%tree.topic.node.name" path="topic" property="topics" icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/topic.svg"/>
                     </items>
                     <!-- Root topics (without "/" in paths) -->
-                    <items label="%tree.topic.node.name" path="topic" property="rootTopics" icon="#table"/>
+                    <items label="%tree.topic.node.name" path="topic" property="rootTopics" icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/topic.svg"/>
                 </folder>
                 <!-- Transfers for data replication -->
                 <folder id="ydbTransfers" label="%tree.transfers.node.name" icon="#folder_table" description="%tree.transfers.node.tip" visibleIf="object.isDataEngineeringMode()">
@@ -74,10 +74,10 @@
                         <!-- Nested subfolders (recursive) -->
                         <items label="%tree.transfer_folder.node.name" path="transferSubFolder" property="subFolders" icon="#folder_table" recursive=".."/>
                         <!-- Transfers inside folder -->
-                        <items label="%tree.transfer.node.name" path="transfer" property="transfers" icon="#table"/>
+                        <items label="%tree.transfer.node.name" path="transfer" property="transfers" icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/transfer.svg"/>
                     </items>
                     <!-- Root transfers (without "/" in paths) -->
-                    <items label="%tree.transfer.node.name" path="transfer" property="rootTransfers" icon="#table"/>
+                    <items label="%tree.transfer.node.name" path="transfer" property="rootTransfers" icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/transfer.svg"/>
                 </folder>
                 <!-- External Data Sources -->
                 <folder id="ydbExternalDataSources" label="%tree.external_data_sources.node.name" icon="#folder_table" description="%tree.external_data_sources.node.tip" visibleIf="object.isDataEngineeringMode()">
@@ -118,10 +118,10 @@
                         <!-- Nested subfolders (recursive) -->
                         <items label="%tree.streaming_query_folder.node.name" path="streamingQuerySubFolder" property="subFolders" icon="#folder" recursive=".."/>
                         <!-- Queries inside folder -->
-                        <items label="%tree.streaming_query.node.name" path="streamingQuery" property="queries" icon="#sql_text"/>
+                        <items label="%tree.streaming_query.node.name" path="streamingQuery" property="queries" icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/streaming_query.svg"/>
                     </items>
                     <!-- Root queries (without "/" in Path) -->
-                    <items label="%tree.streaming_query.node.name" path="streamingQuery" property="rootStreamingQueries" icon="#sql_text"/>
+                    <items label="%tree.streaming_query.node.name" path="streamingQuery" property="rootStreamingQueries" icon="platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/streaming_query.svg"/>
                 </folder>
             </tree>
 

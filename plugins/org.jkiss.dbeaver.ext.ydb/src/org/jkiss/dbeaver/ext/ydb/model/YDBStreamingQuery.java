@@ -38,6 +38,9 @@ import java.util.Map;
  */
 public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScriptObject, DBPImageProvider {
 
+    public static final DBIcon ICON = new DBIcon(
+        "platform:/plugin/org.jkiss.dbeaver.ext.ydb/icons/streaming_query.svg");
+
     private final DBSObject parent;
     private final String name;
     private final String fullPath;
@@ -194,7 +197,7 @@ public class YDBStreamingQuery implements DBSObject, DBPToolTipObject, DBPScript
     @Override
     public DBPImage getObjectImage() {
         if (isInErrorState()) {
-            return new DBIconComposite(DBIcon.SQL_TEXT, false, null, null, null, DBIcon.OVER_ERROR);
+            return new DBIconComposite(ICON, false, null, null, null, DBIcon.OVER_ERROR);
         }
         return null;
     }

@@ -272,7 +272,7 @@ public class YDBStreamingQueryTest {
         assertNotNull(img);
         assertTrue(img instanceof DBIconComposite);
         DBIconComposite composite = (DBIconComposite) img;
-        assertSame(DBIcon.SQL_TEXT, composite.getMain());
+        assertSame(YDBStreamingQuery.ICON, composite.getMain());
         assertSame(DBIcon.OVER_ERROR, composite.getBottomRight());
     }
 }
