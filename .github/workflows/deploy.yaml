@@ -93,7 +93,17 @@ jobs:
 
           aws s3 sync "$REPO_DIR" "$S3_DEST" \
             --endpoint-url "$YC_ENDPOINT" \
-            --no-progress
+            --no-progress \
+            --exclude 'p2.index'
+
+          # Write a correct child p2.index matching files we actually uploaded (*.jar)
+          cat > child_p2.index << 'EOF'
+          version=1
+          metadata.repository.factory.order=content.jar,content.xml,\!
+          artifact.repository.factory.order=artifacts.jar,artifacts.xml,\!
+          EOF
+          aws s3 cp child_p2.index "${S3_DEST}p2.index" \
+            --endpoint-url "$YC_ENDPOINT" --content-type 'text/plain'
 
           # Collect all version subdirectories from S3
           VERSIONS=$(aws s3 ls "${S3_BASE}/" \
@@ -137,8 +147,8 @@ jobs:
           # Generate p2.index
           cat > p2.index << EOF
           version=1
-          metadata.repository.factory.order=compositeContent,\!
-          artifact.repository.factory.order=compositeArtifacts,\!
+          metadata.repository.factory.order=compositeContent.xml,\!
+          artifact.repository.factory.order=compositeArtifacts.xml,\!
           EOF
 
           # Upload composite files to bucket root
