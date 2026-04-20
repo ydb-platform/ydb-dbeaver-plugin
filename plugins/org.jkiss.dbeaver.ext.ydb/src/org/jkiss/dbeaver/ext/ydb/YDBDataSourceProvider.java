@@ -22,7 +22,6 @@ import org.jkiss.dbeaver.ext.generic.GenericDataSourceProvider;
 import org.jkiss.dbeaver.ext.generic.GenericMetaModelRegistry;
 import org.jkiss.dbeaver.ext.generic.model.meta.GenericMetaModel;
 import org.jkiss.dbeaver.ext.ydb.model.YDBDataSource;
-import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
 import org.jkiss.dbeaver.model.connection.DBPConnectionConfiguration;
 import org.jkiss.dbeaver.model.connection.DBPDriver;
@@ -32,7 +31,7 @@ import org.jkiss.utils.CommonUtils;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-public class YDBDataSourceProvider extends GenericDataSourceProvider {
+public class YDBDataSourceProvider extends GenericDataSourceProvider<YDBDataSource> {
 
     private static final String PROP_AUTH_TYPE = "ydb.authType";
     private static final String PROP_TOKEN = "ydb.token";
@@ -41,6 +40,7 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider {
     private static final String PROP_SSL_CERTIFICATE = "ydb.sslCertificate";
 
     public YDBDataSourceProvider() {
+        super(YDBDataSource.class);
     }
 
     @Override
@@ -123,7 +123,7 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider {
 
     @NotNull
     @Override
-    public DBPDataSource openDataSource(
+    public YDBDataSource openDataSource(
             @NotNull DBRProgressMonitor monitor,
             @NotNull DBPDataSourceContainer container)
             throws DBException {
