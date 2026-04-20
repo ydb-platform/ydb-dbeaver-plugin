@@ -384,6 +384,10 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
 
     @Override
     public boolean isComplete() {
+        if (hostText == null || hostText.isDisposed()
+            || databaseText == null || databaseText.isDisposed()) {
+            return false;
+        }
         return !CommonUtils.isEmpty(hostText.getText()) &&
                !CommonUtils.isEmpty(databaseText.getText());
     }
