@@ -18,20 +18,39 @@ package org.jkiss.dbeaver.ext.ydb;
 
 import org.jkiss.code.NotNull;
 import org.jkiss.dbeaver.DBException;
-import org.jkiss.dbeaver.ext.generic.GenericDataSourceProvider;
 import org.jkiss.dbeaver.ext.generic.GenericMetaModelRegistry;
 import org.jkiss.dbeaver.ext.generic.model.meta.GenericMetaModel;
 import org.jkiss.dbeaver.ext.ydb.model.YDBDataSource;
+import org.jkiss.dbeaver.model.DBPDataSource;
 import org.jkiss.dbeaver.model.DBPDataSourceContainer;
+import org.jkiss.dbeaver.model.DBPDataSourceProvider;
+import org.jkiss.dbeaver.model.app.DBPPlatform;
 import org.jkiss.dbeaver.model.connection.DBPConnectionConfiguration;
 import org.jkiss.dbeaver.model.connection.DBPDriver;
+import org.jkiss.dbeaver.model.preferences.DBPPropertyDescriptor;
 import org.jkiss.dbeaver.model.runtime.DBRProgressMonitor;
 import org.jkiss.utils.CommonUtils;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
-public class YDBDataSourceProvider extends GenericDataSourceProvider<YDBDataSource> {
+/**
+ * YDB data source provider.
+ *
+ * Deliberately implements {@link DBPDataSourceProvider} via the raw interface
+ * type instead of extending {@code GenericDataSourceProvider}. Upstream
+ * DBeaver changed the generic provider's constructor signature (no-arg → one
+ * accepting {@code Class<?>}) in a non-backward-compatible way; since this
+ * plugin ships externally and has no control over the host DBeaver build,
+ * extending that class makes the plugin fail at instantiation against either
+ * older or newer runtimes depending on which variant we compile against.
+ *
+ * The raw-interface binding erases identically across DBeaver versions and
+ * keeps the plugin loadable on any runtime that provides the
+ * {@code DBPDataSourceProvider} contract.
+ */
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class YDBDataSourceProvider implements DBPDataSourceProvider {
 
     private static final String PROP_AUTH_TYPE = "ydb.authType";
     private static final String PROP_TOKEN = "ydb.token";
@@ -40,7 +59,11 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider<YDBDataSour
     private static final String PROP_SSL_CERTIFICATE = "ydb.sslCertificate";
 
     public YDBDataSourceProvider() {
-        super(YDBDataSource.class);
+    }
+
+    @Override
+    public void init(@NotNull DBPPlatform platform) {
+        // nothing to initialize
     }
 
     @Override
@@ -50,10 +73,26 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider<YDBDataSour
 
     @NotNull
     @Override
+    public DBPPropertyDescriptor[] getConnectionProperties(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull DBPDriver driver,
+        @NotNull DBPConnectionConfiguration connectionInfo
+    ) throws DBException {
+        return new DBPPropertyDescriptor[0];
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends DBPDataSource> getDataSourceClass() {
+        return YDBDataSource.class;
+    }
+
+    @NotNull
+    @Override
     public String getConnectionURL(@NotNull DBPDriver driver, @NotNull DBPConnectionConfiguration connectionInfo) {
         String host = connectionInfo.getHostName();
         if (CommonUtils.isEmpty(host)) {
-            return super.getConnectionURL(driver, connectionInfo);
+            return "";
         }
 
         String port = connectionInfo.getHostPort();
@@ -105,7 +144,6 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider<YDBDataSour
             }
         }
 
-        // Add SSL certificate if specified
         String sslCert = connectionInfo.getProviderProperty(PROP_SSL_CERTIFICATE);
         if (!CommonUtils.isEmpty(sslCert)) {
             if (params.length() > 0) {
@@ -123,10 +161,10 @@ public class YDBDataSourceProvider extends GenericDataSourceProvider<YDBDataSour
 
     @NotNull
     @Override
-    public YDBDataSource openDataSource(
-            @NotNull DBRProgressMonitor monitor,
-            @NotNull DBPDataSourceContainer container)
-            throws DBException {
+    public DBPDataSource openDataSource(
+        @NotNull DBRProgressMonitor monitor,
+        @NotNull DBPDataSourceContainer container
+    ) throws DBException {
         GenericMetaModel metaModel = GenericMetaModelRegistry.getInstance().getMetaModel(container);
         return new YDBDataSource(monitor, container, metaModel);
     }
