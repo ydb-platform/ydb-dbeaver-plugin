@@ -80,6 +80,10 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
     private Composite tokenGroup;
     private Composite saFileGroup;
 
+    private Text jdbcUrlPreview;
+    private boolean monitoringUrlAutoFilled = true;
+    private boolean settingMonitoringUrlProgrammatically;
+
     private final String[] authTypes = {
         AUTH_ANONYMOUS,
         AUTH_STATIC,
@@ -114,7 +118,11 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         UIUtils.createControlLabel(connectionGroup, "Host");
         hostText = new Text(connectionGroup, SWT.BORDER);
         hostText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-        hostText.addModifyListener(textListener);
+        hostText.addModifyListener(e -> {
+            updateMonitoringUrlIfAuto();
+            updateUrl();
+            site.updateButtons();
+        });
 
         // Port
         UIUtils.createControlLabel(connectionGroup, "Port");
@@ -139,7 +147,15 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
         gd.horizontalSpan = 3;
         monitoringUrlText.setLayoutData(gd);
         monitoringUrlText.setToolTipText(YDBUIMessages.dialog_connection_monitoring_port_tip);
-        monitoringUrlText.addModifyListener(textListener);
+        monitoringUrlText.addModifyListener(e -> {
+            if (!settingMonitoringUrlProgrammatically) {
+                String current = monitoringUrlText.getText().trim();
+                monitoringUrlAutoFilled = current.isEmpty()
+                    || current.equals(computeMonitoringUrl(hostText.getText().trim(), useSecureCheckbox.getSelection()));
+            }
+            updateUrl();
+            site.updateButtons();
+        });
 
         // Use secure connection
         useSecureCheckbox = UIUtils.createCheckbox(connectionGroup,
@@ -151,6 +167,7 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             @Override
             public void widgetSelected(SelectionEvent e) {
                 updateSslCertControls();
+                updateMonitoringUrlIfAuto();
                 updateUrl();
                 site.updateButtons();
             }
@@ -275,12 +292,44 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             }
         });
 
+        // JDBC URL preview
+        Group urlGroup = UIUtils.createControlGroup(control, YDBUIMessages.dialog_connection_jdbc_url, 1, GridData.FILL_HORIZONTAL, 0);
+        jdbcUrlPreview = new Text(urlGroup, SWT.BORDER | SWT.SINGLE);
+        jdbcUrlPreview.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+        jdbcUrlPreview.setToolTipText(YDBUIMessages.dialog_connection_jdbc_url_tip);
+        jdbcUrlPreview.setEnabled(false);
+
         // Set default auth type and update visibility
         authTypeCombo.select(0);
         updateAuthControls();
         updateSslCertControls();
 
         setControl(control);
+    }
+
+    private String computeMonitoringUrl(String host, boolean secure) {
+        if (CommonUtils.isEmpty(host)) {
+            return "";
+        }
+        return (secure ? "https://" : "http://") + host + ":8765";
+    }
+
+    private void updateMonitoringUrlIfAuto() {
+        if (monitoringUrlText == null || monitoringUrlText.isDisposed()) {
+            return;
+        }
+        if (!monitoringUrlAutoFilled) {
+            return;
+        }
+        String generated = computeMonitoringUrl(hostText.getText().trim(), useSecureCheckbox.getSelection());
+        if (!monitoringUrlText.getText().equals(generated)) {
+            settingMonitoringUrlProgrammatically = true;
+            try {
+                monitoringUrlText.setText(generated);
+            } finally {
+                settingMonitoringUrlProgrammatically = false;
+            }
+        }
     }
 
     private void updateSslCertControls() {
@@ -379,7 +428,11 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             url.append("?").append(params);
         }
 
-        site.getActiveDataSource().getConnectionConfiguration().setUrl(url.toString());
+        String urlString = url.toString();
+        site.getActiveDataSource().getConnectionConfiguration().setUrl(urlString);
+        if (jdbcUrlPreview != null && !jdbcUrlPreview.isDisposed()) {
+            jdbcUrlPreview.setText(urlString);
+        }
     }
 
     @Override
@@ -454,15 +507,25 @@ public class YDBConnectionPage extends ConnectionPageAbstract implements IDialog
             saFileText.setText(saFile);
         }
 
-        // Load monitoring URL
-        String monitoringUrl = connectionInfo.getProviderProperty(PROP_MONITORING_URL);
-        if (!CommonUtils.isEmpty(monitoringUrl)) {
-            monitoringUrlText.setText(monitoringUrl);
-        }
-
-        // Load secure setting
+        // Load secure setting (must come before monitoring URL detection)
         String useSecure = connectionInfo.getProviderProperty(PROP_USE_SECURE);
         useSecureCheckbox.setSelection(CommonUtils.isEmpty(useSecure) || CommonUtils.toBoolean(useSecure));
+
+        // Load monitoring URL
+        String monitoringUrl = connectionInfo.getProviderProperty(PROP_MONITORING_URL);
+        settingMonitoringUrlProgrammatically = true;
+        try {
+            if (!CommonUtils.isEmpty(monitoringUrl)) {
+                monitoringUrlText.setText(monitoringUrl);
+                String generated = computeMonitoringUrl(hostName, useSecureCheckbox.getSelection());
+                monitoringUrlAutoFilled = monitoringUrl.equals(generated);
+            } else {
+                monitoringUrlAutoFilled = true;
+                monitoringUrlText.setText(computeMonitoringUrl(hostName, useSecureCheckbox.getSelection()));
+            }
+        } finally {
+            settingMonitoringUrlProgrammatically = false;
+        }
 
         // Load SSL certificate
         String sslCertificate = connectionInfo.getProviderProperty(PROP_SSL_CERTIFICATE);

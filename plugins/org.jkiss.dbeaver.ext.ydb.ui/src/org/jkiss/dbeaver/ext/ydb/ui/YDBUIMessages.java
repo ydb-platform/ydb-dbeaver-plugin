@@ -40,6 +40,8 @@ public class YDBUIMessages extends NLS {
     public static String dialog_connection_ssl_certificate_tip;
     public static String dialog_connection_data_engineering_mode;
     public static String dialog_connection_data_engineering_mode_tip;
+    public static String dialog_connection_jdbc_url;
+    public static String dialog_connection_jdbc_url_tip;
 
     static {
         NLS.initializeMessages(BUNDLE_NAME, YDBUIMessages.class);
