@@ -12,6 +12,16 @@ YDB_DATA_DIR="/tmp/ydb-it-data"
 YDB_CONFIG_DIR="/tmp/ydb-it-config"
 WAIT_TIMEOUT=120
 
+# Second YDB container with login authentication enforced — used by
+# YDBMonitoringAuthIT to validate the /login + session-cookie flow.
+# Listens on alternate ports so it doesn't collide with the primary container.
+YDB_AUTH_CONTAINER="ydb-it-auth"
+YDB_AUTH_GRPC_PORT=2138
+YDB_AUTH_VIEWER_PORT=8766
+YDB_AUTH_DATA_DIR="/tmp/ydb-it-auth-data"
+YDB_AUTH_CONFIG_DIR="/tmp/ydb-it-auth-config"
+YDB_AUTH_VIEWER_URL="http://localhost:${YDB_AUTH_VIEWER_PORT}"
+
 MINIO_IMAGE="quay.io/minio/minio:latest"
 MINIO_CONTAINER="minio-it"
 MINIO_PORT=9000
@@ -32,8 +42,9 @@ die()  { echo "[run-tests] ERROR: $*" >&2; exit 1; }
 cleanup() {
     log "Cleaning up containers ..."
     $RT rm -f "${YDB_CONTAINER}" >/dev/null 2>&1 || true
+    $RT rm -f "${YDB_AUTH_CONTAINER}" >/dev/null 2>&1 || true
     $RT rm -f "${MINIO_CONTAINER}" >/dev/null 2>&1 || true
-    rm -rf "${YDB_DATA_DIR}" "${YDB_CONFIG_DIR}"
+    rm -rf "${YDB_DATA_DIR}" "${YDB_CONFIG_DIR}" "${YDB_AUTH_DATA_DIR}" "${YDB_AUTH_CONFIG_DIR}"
 }
 trap cleanup EXIT
 
@@ -45,8 +56,9 @@ done
 
 # ── stop existing containers ─────────────────────────────────────────────────
 $RT rm -f "${YDB_CONTAINER}" >/dev/null 2>&1 || true
+$RT rm -f "${YDB_AUTH_CONTAINER}" >/dev/null 2>&1 || true
 $RT rm -f "${MINIO_CONTAINER}" >/dev/null 2>&1 || true
-rm -rf "${YDB_DATA_DIR}" "${YDB_CONFIG_DIR}"
+rm -rf "${YDB_DATA_DIR}" "${YDB_CONFIG_DIR}" "${YDB_AUTH_DATA_DIR}" "${YDB_AUTH_CONFIG_DIR}"
 mkdir -p "${YDB_DATA_DIR}" "${YDB_CONFIG_DIR}"
 
 # ── start MinIO (S3 for external table tests) ────────────────────────────────
@@ -158,6 +170,55 @@ for i in $(seq 1 "${WAIT_TIMEOUT}"); do
     sleep 1
 done
 
+# ── start second YDB container with login authentication enforced ───────────
+# Uses the same generated config as the main container, plus a security_config
+# block that requires every request to carry a valid auth token. Listens on
+# alternate ports so it doesn't collide with the primary YDB.
+log "Setting up auth-enforced YDB container ..."
+mkdir -p "${YDB_AUTH_DATA_DIR}" "${YDB_AUTH_CONFIG_DIR}"
+cp "${PATCHED_CONFIG}" "${YDB_AUTH_CONFIG_DIR}/config.yaml"
+AUTH_CONFIG="${YDB_AUTH_CONFIG_DIR}/config.yaml"
+if ! grep -q '^security_config:' "${AUTH_CONFIG}"; then
+    cat >> "${AUTH_CONFIG}" <<'EOF'
+
+security_config:
+  enforce_user_token_requirement: true
+  default_user_sids: []
+EOF
+fi
+
+log "Starting auth-enforced YDB on grpc:${YDB_AUTH_GRPC_PORT} viewer:${YDB_AUTH_VIEWER_PORT} ..."
+$RT run -d \
+    --rm \
+    --name "${YDB_AUTH_CONTAINER}" \
+    --hostname localhost \
+    -p "${YDB_AUTH_GRPC_PORT}:${YDB_AUTH_GRPC_PORT}" \
+    -p "${YDB_AUTH_VIEWER_PORT}:${YDB_AUTH_VIEWER_PORT}" \
+    -v "${YDB_AUTH_DATA_DIR}:/ydb_data" \
+    -v "${YDB_AUTH_CONFIG_DIR}:/ydb_config" \
+    -e YDB_USE_IN_MEMORY_PDISKS=false \
+    -e YDB_PDISK_SIZE=68719476736 \
+    -e GRPC_PORT="${YDB_AUTH_GRPC_PORT}" \
+    -e MON_PORT="${YDB_AUTH_VIEWER_PORT}" \
+    "${YDB_IMAGE}" \
+    --config-path /ydb_config/config.yaml >/dev/null
+
+log "Waiting for auth-enforced YDB viewer (HTTP) ..."
+for i in $(seq 1 "${WAIT_TIMEOUT}"); do
+    # Viewer responds with 401 once it's up — that's the "ready" signal.
+    code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 \
+        "${YDB_AUTH_VIEWER_URL}/viewer/json/cluster" 2>/dev/null || echo "000")
+    if [ "${code}" = "401" ] || [ "${code}" = "200" ]; then
+        log "Auth-enforced YDB viewer ready after ${i}s (HTTP ${code})"
+        break
+    fi
+    if [ "${i}" -eq "${WAIT_TIMEOUT}" ]; then
+        $RT logs "${YDB_AUTH_CONTAINER}" >&2
+        die "Auth-enforced YDB viewer did not start within ${WAIT_TIMEOUT}s"
+    fi
+    sleep 1
+done
+
 # ── build ydb-plugin-core (shared code used by tests) ────────────────────────
 log "Building ydb-plugin-core ..."
 mvn install -f "${SCRIPT_DIR}/../ydb-plugin-core/pom.xml" -q
@@ -168,6 +229,10 @@ EXIT_CODE=0
 mvn verify -f "${SCRIPT_DIR}/pom.xml" \
     -Dydb.jdbc.url="${YDB_URL}" \
     -Ds3.url="http://localhost:${MINIO_PORT}" \
+    -Dydb.it.monitoring.url="http://localhost:8765" \
+    -Dydb.it.monitoring.auth.url="${YDB_AUTH_VIEWER_URL}" \
+    -Dydb.it.monitoring.auth.user="root" \
+    -Dydb.it.monitoring.auth.password="" \
     || EXIT_CODE=$?
 
 exit "${EXIT_CODE}"

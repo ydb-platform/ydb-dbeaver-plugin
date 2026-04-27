@@ -98,14 +98,21 @@ public class YDBDashboardDataCache {
 
         String authType = config.getProviderProperty(YDBConnectionPage.PROP_AUTH_TYPE);
         String token = null;
+        String userName = null;
+        String password = null;
         if ("token".equals(authType)) {
             token = config.getProviderProperty(YDBConnectionPage.PROP_TOKEN);
+        } else {
+            userName = config.getUserName();
+            password = config.getUserPassword();
         }
 
         YDBViewerClient client = new YDBViewerClient(
             baseUrl != null ? baseUrl : "http://localhost:8765",
             database,
-            token
+            token,
+            userName,
+            password
         );
 
         CacheEntry entry = new CacheEntry(client, dsContainer);

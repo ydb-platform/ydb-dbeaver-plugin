@@ -18,6 +18,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <ydb.jdbc.url>jdbc:ydb:grpc://localhost:2136/local?sessionPoolMinSize=0&amp;socketReadTimeout=20000</ydb.jdbc.url>
         <s3.url>http://localhost:9000</s3.url>
+        <ydb.it.monitoring.url>http://localhost:8765</ydb.it.monitoring.url>
+        <ydb.it.monitoring.database>/local</ydb.it.monitoring.database>
+        <!-- Empty by default → YDBMonitoringAuthIT is skipped via @EnabledIfSystemProperty -->
+        <ydb.it.monitoring.auth.url></ydb.it.monitoring.auth.url>
+        <ydb.it.monitoring.auth.database>/local</ydb.it.monitoring.auth.database>
+        <ydb.it.monitoring.auth.user>root</ydb.it.monitoring.auth.user>
+        <ydb.it.monitoring.auth.password></ydb.it.monitoring.auth.password>
         <junit.version>5.10.1</junit.version>
     </properties>
 
@@ -58,6 +65,12 @@
                     <systemPropertyVariables>
                         <ydb.jdbc.url>${ydb.jdbc.url}</ydb.jdbc.url>
                         <s3.url>${s3.url}</s3.url>
+                        <ydb.it.monitoring.url>${ydb.it.monitoring.url}</ydb.it.monitoring.url>
+                        <ydb.it.monitoring.database>${ydb.it.monitoring.database}</ydb.it.monitoring.database>
+                        <ydb.it.monitoring.auth.url>${ydb.it.monitoring.auth.url}</ydb.it.monitoring.auth.url>
+                        <ydb.it.monitoring.auth.database>${ydb.it.monitoring.auth.database}</ydb.it.monitoring.auth.database>
+                        <ydb.it.monitoring.auth.user>${ydb.it.monitoring.auth.user}</ydb.it.monitoring.auth.user>
+                        <ydb.it.monitoring.auth.password>${ydb.it.monitoring.auth.password}</ydb.it.monitoring.auth.password>
                     </systemPropertyVariables>
                     <forkedProcessTimeoutInSeconds>60</forkedProcessTimeoutInSeconds>
                 </configuration>

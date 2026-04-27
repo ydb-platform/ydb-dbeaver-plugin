@@ -24,6 +24,7 @@ import org.jkiss.utils.CommonUtils;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -37,25 +38,41 @@ public class YDBViewerClient {
 
     private static final int CONNECT_TIMEOUT_MS = 5000;
     private static final int READ_TIMEOUT_MS = 10000;
+    private static final long SESSION_TTL_MS = 60L * 60L * 1000L; // 1 hour
+    private static final String SESSION_COOKIE_NAME = "ydb_session_id";
     private static final Pattern JDBC_URL_PATTERN = Pattern.compile(
         "jdbc:ydb:(grpcs?)://([^:/]+)(?::(\\d+))?(/.*?)(?:\\?.*)?$"
+    );
+    private static final Pattern SESSION_COOKIE_PATTERN = Pattern.compile(
+        "(?:^|[;,\\s])" + Pattern.quote(SESSION_COOKIE_NAME) + "=([^;,\\s]+)"
     );
 
     private final String baseUrl;
     private final String database;
     private final String authToken;
+    private final String user;
+    private final String password;
+
+    private final Object sessionLock = new Object();
+    private volatile String sessionCookie;
+    private volatile long sessionExpiresAt;
 
     public YDBViewerClient(String baseUrl, String database, String authToken) {
+        this(baseUrl, database, authToken, null, null);
+    }
+
+    public YDBViewerClient(String baseUrl, String database, String authToken, String user, String password) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.database = database;
         this.authToken = authToken;
+        this.user = user;
+        this.password = password;
     }
 
     public static String resolveBaseUrl(String explicitUrl, String jdbcUrl, String hostName, boolean secure) {
         if (!CommonUtils.isEmpty(explicitUrl)) {
             return explicitUrl;
         }
-        // Try parsing JDBC URL first
         if (!CommonUtils.isEmpty(jdbcUrl)) {
             Matcher matcher = JDBC_URL_PATTERN.matcher(jdbcUrl);
             if (matcher.find()) {
@@ -64,7 +81,6 @@ public class YDBViewerClient {
                 return scheme + "://" + host + ":8765";
             }
         }
-        // Fallback: build from host name and secure flag
         if (!CommonUtils.isEmpty(hostName)) {
             String scheme = secure ? "https" : "http";
             return scheme + "://" + hostName + ":8765";
@@ -87,21 +103,18 @@ public class YDBViewerClient {
         String json = httpGet(baseUrl + "/viewer/json/cluster");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
 
-        // All metrics are at the top level of the response
         if (root.has("CoresTotal")) {
             info.setCoresTotal(root.get("CoresTotal").getAsDouble());
         }
         if (root.has("CoresUsed")) {
             info.setCoresUsed(root.get("CoresUsed").getAsDouble());
         }
-        // MemoryTotal and MemoryUsed are strings in the JSON
         if (root.has("MemoryTotal")) {
             info.setMemoryTotal(Long.parseLong(root.get("MemoryTotal").getAsString()));
         }
         if (root.has("MemoryUsed")) {
             info.setMemoryUsed(Long.parseLong(root.get("MemoryUsed").getAsString()));
         }
-        // StorageTotal and StorageUsed are strings in the JSON
         if (root.has("StorageTotal")) {
             info.setStorageTotal(Long.parseLong(root.get("StorageTotal").getAsString()));
         }
@@ -117,7 +130,6 @@ public class YDBViewerClient {
         if (root.has("Overall")) {
             info.setOverallStatus(root.get("Overall").getAsString());
         }
-        // NetworkWriteThroughput is a string (bytes per second)
         if (root.has("NetworkWriteThroughput")) {
             info.setNetworkBytesPerSec(Double.parseDouble(root.get("NetworkWriteThroughput").getAsString()));
         }
@@ -170,7 +182,6 @@ public class YDBViewerClient {
             }
         }
 
-        // Sort by load percent descending
         nodes.sort((a, b) -> Double.compare(b.getLoadPercent(), a.getLoadPercent()));
         info.setNodes(nodes);
     }
@@ -178,6 +189,16 @@ public class YDBViewerClient {
     private static final int MAX_REDIRECTS = 5;
 
     private String httpGet(String urlString) throws Exception {
+        try {
+            return doHttpGet(urlString, false);
+        } catch (UnauthorizedException e) {
+            // Cookie may have been rotated/invalidated server-side — drop and retry once
+            invalidateSession();
+            return doHttpGet(urlString, true);
+        }
+    }
+
+    private String doHttpGet(String urlString, boolean isRetry) throws Exception {
         String currentUrl = urlString;
         for (int i = 0; i < MAX_REDIRECTS; i++) {
             URI uri = URI.create(currentUrl);
@@ -188,9 +209,7 @@ public class YDBViewerClient {
                 connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 connection.setReadTimeout(READ_TIMEOUT_MS);
                 connection.setRequestProperty("Accept", "application/json");
-                if (!CommonUtils.isEmpty(authToken)) {
-                    connection.setRequestProperty("Authorization", "OAuth " + authToken);
-                }
+                applyAuth(connection);
 
                 int responseCode = connection.getResponseCode();
                 if (responseCode == 301 || responseCode == 302
@@ -200,13 +219,16 @@ public class YDBViewerClient {
                         throw new Exception("Redirect without Location from " + currentUrl);
                     }
                     if (location.startsWith("/")) {
-                        // Relative redirect — resolve against current URL
                         URI base = URI.create(currentUrl);
                         currentUrl = base.getScheme() + "://" + base.getAuthority() + location;
                     } else {
                         currentUrl = location;
                     }
                     continue;
+                }
+
+                if (responseCode == 401 && !isRetry) {
+                    throw new UnauthorizedException(currentUrl);
                 }
 
                 if (responseCode != 200) {
@@ -227,5 +249,97 @@ public class YDBViewerClient {
             }
         }
         throw new Exception("Too many redirects from " + urlString);
+    }
+
+    private void applyAuth(HttpURLConnection connection) throws Exception {
+        if (!CommonUtils.isEmpty(authToken)) {
+            connection.setRequestProperty("Authorization", "OAuth " + authToken);
+            return;
+        }
+        if (!CommonUtils.isEmpty(user)) {
+            String cookie = ensureSession();
+            if (cookie != null) {
+                connection.setRequestProperty("Cookie", SESSION_COOKIE_NAME + "=" + cookie);
+            }
+        }
+    }
+
+    private String ensureSession() throws Exception {
+        String cookie = sessionCookie;
+        if (cookie != null && System.currentTimeMillis() < sessionExpiresAt) {
+            return cookie;
+        }
+        synchronized (sessionLock) {
+            if (sessionCookie != null && System.currentTimeMillis() < sessionExpiresAt) {
+                return sessionCookie;
+            }
+            String fresh = login();
+            sessionCookie = fresh;
+            sessionExpiresAt = System.currentTimeMillis() + SESSION_TTL_MS;
+            return fresh;
+        }
+    }
+
+    private void invalidateSession() {
+        synchronized (sessionLock) {
+            sessionCookie = null;
+            sessionExpiresAt = 0;
+        }
+    }
+
+    private String login() throws Exception {
+        String urlString = baseUrl + "/login";
+        URI uri = URI.create(urlString);
+        HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+        try {
+            connection.setInstanceFollowRedirects(false);
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Accept", "application/json");
+
+            JsonObject body = new JsonObject();
+            body.addProperty("user", user);
+            body.addProperty("password", password == null ? "" : password);
+            byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = connection.getOutputStream()) {
+                os.write(payload);
+            }
+
+            int code = connection.getResponseCode();
+            if (code != 200) {
+                throw new Exception("Login failed: HTTP " + code + " from " + urlString);
+            }
+
+            // Set-Cookie header may be split across multiple values; getHeaderFields gives all of them
+            for (String header : connection.getHeaderFields().getOrDefault("Set-Cookie", List.of())) {
+                String value = extractSessionCookie(header);
+                if (value != null) {
+                    return value;
+                }
+            }
+            throw new Exception("Login response did not contain " + SESSION_COOKIE_NAME + " cookie");
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    static String extractSessionCookie(String setCookieHeader) {
+        if (setCookieHeader == null) {
+            return null;
+        }
+        Matcher m = SESSION_COOKIE_PATTERN.matcher(setCookieHeader);
+        if (m.find()) {
+            return m.group(1);
+        }
+        return null;
+    }
+
+    private static final class UnauthorizedException extends Exception {
+        UnauthorizedException(String url) {
+            super("HTTP 401 from " + url);
+        }
     }
 }
