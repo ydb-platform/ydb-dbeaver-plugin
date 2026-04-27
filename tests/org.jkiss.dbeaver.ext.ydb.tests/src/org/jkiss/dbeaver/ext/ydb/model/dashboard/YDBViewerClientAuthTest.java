@@ -22,6 +22,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -72,10 +74,10 @@ public class YDBViewerClientAuthTest {
     public void applyAuth_tokenWins() throws Exception {
         YDBViewerClient client = new YDBViewerClient(
             "http://localhost:8765", "/local", "my-oauth-token", "user", "pwd");
-        HttpURLConnection conn = openDummyConnection();
+        RecordingHttpURLConnection conn = new RecordingHttpURLConnection();
         invokeApplyAuth(client, conn);
-        assertEquals("OAuth my-oauth-token", conn.getRequestProperty("Authorization"));
-        assertNull(conn.getRequestProperty("Cookie"));
+        assertEquals("OAuth my-oauth-token", conn.properties.get("Authorization"));
+        assertNull(conn.properties.get("Cookie"));
     }
 
     @Test
@@ -85,20 +87,20 @@ public class YDBViewerClientAuthTest {
         // Pre-seed a valid session so we don't hit the network
         seedSession(client, "cookie-value-xyz", System.currentTimeMillis() + 60_000);
 
-        HttpURLConnection conn = openDummyConnection();
+        RecordingHttpURLConnection conn = new RecordingHttpURLConnection();
         invokeApplyAuth(client, conn);
-        assertEquals("ydb_session_id=cookie-value-xyz", conn.getRequestProperty("Cookie"));
-        assertNull(conn.getRequestProperty("Authorization"));
+        assertEquals("ydb_session_id=cookie-value-xyz", conn.properties.get("Cookie"));
+        assertNull(conn.properties.get("Authorization"));
     }
 
     @Test
     public void applyAuth_noCredentialsSetsNoHeader() throws Exception {
         YDBViewerClient client = new YDBViewerClient(
             "http://localhost:8765", "/local", null, null, null);
-        HttpURLConnection conn = openDummyConnection();
+        RecordingHttpURLConnection conn = new RecordingHttpURLConnection();
         invokeApplyAuth(client, conn);
-        assertNull(conn.getRequestProperty("Authorization"));
-        assertNull(conn.getRequestProperty("Cookie"));
+        assertNull(conn.properties.get("Authorization"));
+        assertNull(conn.properties.get("Cookie"));
     }
 
     // ── Session TTL ──────────────────────────────────────────────────────────
@@ -158,15 +160,31 @@ public class YDBViewerClientAuthTest {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static HttpURLConnection openDummyConnection() throws Exception {
-        // Opening a connection does NOT perform any network I/O until connect()/getResponseCode().
-        return (HttpURLConnection) URI.create("http://localhost:1/").toURL().openConnection();
-    }
-
     private static void invokeApplyAuth(YDBViewerClient client, HttpURLConnection conn) throws Exception {
         Method m = YDBViewerClient.class.getDeclaredMethod("applyAuth", HttpURLConnection.class);
         m.setAccessible(true);
         m.invoke(client, conn);
+    }
+
+    /**
+     * Captures setRequestProperty into a Map. Stock JDK's HttpURLConnection
+     * filters Authorization out of getRequestProperty for security, so we can't
+     * read back what we set — record it ourselves.
+     */
+    private static final class RecordingHttpURLConnection extends HttpURLConnection {
+        final Map<String, String> properties = new HashMap<>();
+
+        RecordingHttpURLConnection() throws Exception {
+            super(URI.create("http://localhost:1/").toURL());
+        }
+
+        @Override public void connect() {}
+        @Override public void disconnect() {}
+        @Override public boolean usingProxy() { return false; }
+
+        @Override public void setRequestProperty(String key, String value) {
+            properties.put(key, value);
+        }
     }
 
     private static void seedSession(YDBViewerClient client, String cookie, long expiresAt) throws Exception {

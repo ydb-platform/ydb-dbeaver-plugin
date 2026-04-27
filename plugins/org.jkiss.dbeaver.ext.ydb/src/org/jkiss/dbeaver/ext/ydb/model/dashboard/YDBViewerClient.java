@@ -326,7 +326,7 @@ public class YDBViewerClient {
         }
     }
 
-    static String extractSessionCookie(String setCookieHeader) {
+    public static String extractSessionCookie(String setCookieHeader) {
         if (setCookieHeader == null) {
             return null;
         }
