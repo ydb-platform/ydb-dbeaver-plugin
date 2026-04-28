@@ -64,7 +64,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build
+      - name: Build (P2 repository)
         run: mvn $MAVEN_ARGS clean package
 
       - name: Upload P2 repository to Yandex Cloud S3
@@ -172,13 +172,31 @@ jobs:
           echo "Deployed ${VERSION_NUM} to: ${YC_ENDPOINT}/ydb-dbeaver-plugin/${VERSION_NUM}"
           echo "Composite repository updated with versions: $(echo $VERSIONS | tr '\n' ' ')"
 
+      - name: Patch plugin.xml for standalone build
+        run: |
+          sed -i '/<file type="jar" path="maven:\/tech.ydb.jdbc:ydb-jdbc-driver-shaded/d' \
+            plugins/org.jkiss.dbeaver.ext.ydb/plugin.xml
+
+      - name: Build (standalone ZIP)
+        run: mvn $MAVEN_ARGS clean package
+
+      - name: Prepare standalone ZIP
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
+          cp "repository/target/org.jkiss.dbeaver.ext.ydb.repository-${VERSION_NUM}.zip" \
+             "ydb-dbeaver-plugin-${VERSION_NUM}.zip"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: YDB DBeaver Plugin ${{ github.ref_name }}
+          files: ydb-dbeaver-plugin-*.zip
           body: |
             ## Installation
+
+            ### Online (via DBeaver update site)
 
             1. Open DBeaver → **Help** → **Install New Software…**
             2. Click **Add…** and enter the P2 repository URL:
@@ -186,3 +204,10 @@ jobs:
                https://storage.yandexcloud.net/ydb-dbeaver-plugin
                ```
             3. Select **YDB DBeaver Plugin** and complete the installation.
+
+            ### Offline (standalone ZIP)
+
+            1. Download `ydb-dbeaver-plugin-*.zip` from the release assets below.
+            2. Open DBeaver → **Help** → **Install New Software…**
+            3. Click **Add…** → **Archive…** → select the downloaded ZIP.
+            4. Select **YDB DBeaver Plugin**, click Next, accept the license, and restart DBeaver.
