@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+* Standalone offline ZIP attached to each GitHub Release — install without internet access via **Help → Install New Software → Archive...**
+
 ## 0.1.0
 
 Initial release.

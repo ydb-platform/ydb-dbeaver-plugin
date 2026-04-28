@@ -6,7 +6,7 @@
 
     <groupId>org.jkiss.dbeaver.ext.ydb</groupId>
     <artifactId>ydb-dbeaver-plugin</artifactId>
-    <version>0.1.3</version>
+    <version>0.1.4</version>
     <packaging>pom</packaging>
     <name>DBeaver YDB Plugin</name>
 

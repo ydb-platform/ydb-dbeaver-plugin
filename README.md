@@ -88,13 +88,15 @@ mvn clean verify
 
 ### Method 1: install from ZIP archive (P2 repository)
 
-Use this method to install from a locally built or downloaded archive.
+Download the latest `ydb-dbeaver-plugin-*.zip` from the [GitHub Releases](https://github.com/ydb-platform/ydb-dbeaver-plugin/releases) page.
+
+This archive works offline — the JDBC driver is bundled inside and no internet connection is required during installation.
 
 **Step 1.** Open DBeaver. In the top menu select **Help → Install New Software...**
 
 **Step 2.** Click **Add...** next to the "Work with:" field.
 
-**Step 3.** In the "Add Repository" dialog click **Archive...**, select the ZIP file `org.jkiss.dbeaver.ext.ydb.repository-1.0.0-SNAPSHOT.zip`, enter a name (e.g. `YDB Plugin`), and click **Add**. DBeaver loads the archive contents.
+**Step 3.** In the "Add Repository" dialog click **Archive...**, select the downloaded ZIP file, enter a name (e.g. `YDB Plugin`), and click **Add**. DBeaver loads the archive contents.
 
 **Step 4.** The category **DBeaver YDB Support** appears in the list. Check it and click **Next >**.
 
