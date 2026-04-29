@@ -307,8 +307,7 @@ Users receive the update:
 If the plugin was installed via **Archive...** (local ZIP file), DBeaver does not know where to look for updates. In that case:
 
 1. Download the new ZIP archive
-2. Remove the old version: **Help → About DBeaver → Installation Details → select plugin → Uninstall** → restart
-3. Install the new version from ZIP following the same instructions as the first time
+2. Open **Help → Installation Information**, select the plugin, and click **Update**.
 
 > **Recommendation:** install via URL `https://storage.yandexcloud.net/ydb-dbeaver-plugin` (Method 2) to receive updates automatically.
 
