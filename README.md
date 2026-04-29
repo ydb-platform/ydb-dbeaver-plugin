@@ -102,6 +102,8 @@ This archive works offline — the JDBC driver is bundled inside and no internet
 
 **Step 5.** On the "Install Details" screen verify that both components are listed (`org.jkiss.dbeaver.ext.ydb` and `org.jkiss.dbeaver.ext.ydb.ui`) and click **Next >**.
 
+> **Tip.** If "Calculating requirements and dependencies..." hangs, uncheck the **Contact all update sites during install to find required software** box at the bottom of the install dialog. The ZIP archive is self-contained and does not need any remote update sites for dependency resolution.
+
 **Step 6.** DBeaver may show an unsigned content warning. This is expected — the plugin JARs are not signed with a commercial certificate. Click **Install Anyway**.
 
 > Eclipse (which DBeaver is based on) verifies JAR signatures to confirm authenticity. This open source plugin is distributed without a signature. The source code is available for review in this repository.
