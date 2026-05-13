@@ -193,6 +193,9 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: YDB DBeaver Plugin ${{ github.ref_name }}
           files: ydb-dbeaver-plugin-*.zip
+          # Auto-generated changelog (commit/PR list since previous tag) gets
+          # prepended above `body`; the Installation block always stays at the bottom.
+          generate_release_notes: true
           body: |
             ## Installation
 
