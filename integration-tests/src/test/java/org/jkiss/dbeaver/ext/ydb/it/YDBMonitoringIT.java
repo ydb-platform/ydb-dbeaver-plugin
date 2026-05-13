@@ -44,6 +44,34 @@ public class YDBMonitoringIT {
             "expected Nodes array in response, got: " + truncate(body));
     }
 
+    /**
+     * Guards the database-scoped dashboard: {@code YDBViewerClient.fetchDatabaseLoad()}
+     * must hit /viewer/json/tenantinfo (per-database), not /viewer/json/cluster
+     * (cluster-wide). This test pins the wire shape we rely on:
+     * the response carries a {@code TenantInfo} array with the metric fields we map.
+     */
+    @Test
+    public void tenantInfoEndpoint_returnsDatabaseScopedMetrics() throws Exception {
+        String url = BASE_URL + "/viewer/json/tenantinfo?path="
+            + URLEncoder.encode(DATABASE, StandardCharsets.UTF_8)
+            + "&tablets=false&system_tablets=false&storage=true&memory=true";
+        String body = httpGet(url, null);
+
+        assertTrue(body.contains("\"TenantInfo\""),
+            "expected TenantInfo array in response, got: " + truncate(body));
+        // Tenant-scoped fields the dashboard maps onto YDBDatabaseLoadInfo.
+        // (Not asserting values — just that the wire contract still includes these keys.)
+        assertTrue(body.contains("\"CoresUsed\"") || body.contains("\"PoolStats\""),
+            "expected CPU metrics in tenantinfo, got: " + truncate(body));
+        assertTrue(body.contains("\"MemoryLimit\"") || body.contains("\"MemoryUsed\""),
+            "expected memory metrics in tenantinfo, got: " + truncate(body));
+        assertTrue(body.contains("\"StorageAllocatedSize\"")
+                || body.contains("\"StorageAllocatedLimit\""),
+            "expected storage metrics in tenantinfo, got: " + truncate(body));
+        assertTrue(body.contains("\"AliveNodes\"") || body.contains("\"NodeIds\""),
+            "expected node info in tenantinfo, got: " + truncate(body));
+    }
+
     static String httpGet(String urlString, String cookie) throws Exception {
         HttpURLConnection c = (HttpURLConnection) URI.create(urlString).toURL().openConnection();
         try {

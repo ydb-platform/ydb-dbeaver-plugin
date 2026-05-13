@@ -91,7 +91,7 @@ public class YDBViewerClient {
     public YDBDatabaseLoadInfo fetchDatabaseLoad() {
         YDBDatabaseLoadInfo info = new YDBDatabaseLoadInfo();
         try {
-            parseClusterInfo(info);
+            parseTenantInfo(info);
             parseNodesInfo(info);
         } catch (Exception e) {
             info.setErrorMessage(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
@@ -99,40 +99,70 @@ public class YDBViewerClient {
         return info;
     }
 
-    private void parseClusterInfo(YDBDatabaseLoadInfo info) throws Exception {
-        String json = httpGet(baseUrl + "/viewer/json/cluster");
+    /**
+     * Fetches per-database (tenant) metrics from /viewer/json/tenantinfo.
+     * Scoped to a single database via ?path=&lt;database&gt; — this is the
+     * database-level analogue of /viewer/json/cluster (which returns cluster-wide totals).
+     */
+    private void parseTenantInfo(YDBDatabaseLoadInfo info) throws Exception {
+        String encodedDb = URLEncoder.encode(database, StandardCharsets.UTF_8);
+        String url = baseUrl + "/viewer/json/tenantinfo?path=" + encodedDb
+            + "&tablets=false&system_tablets=false&storage=true&memory=true";
+        String json = httpGet(url);
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
 
-        if (root.has("CoresTotal")) {
-            info.setCoresTotal(root.get("CoresTotal").getAsDouble());
+        if (!root.has("TenantInfo")) {
+            throw new Exception("TenantInfo missing in response from " + url);
         }
-        if (root.has("CoresUsed")) {
-            info.setCoresUsed(root.get("CoresUsed").getAsDouble());
+        JsonArray tenants = root.getAsJsonArray("TenantInfo");
+        if (tenants.size() == 0) {
+            throw new Exception("No tenant found for path=" + database);
         }
-        if (root.has("MemoryTotal")) {
-            info.setMemoryTotal(Long.parseLong(root.get("MemoryTotal").getAsString()));
+        JsonObject t = tenants.get(0).getAsJsonObject();
+
+        applyTenantMetrics(t, info);
+    }
+
+    static void applyTenantMetrics(JsonObject t, YDBDatabaseLoadInfo info) {
+        if (t.has("CoresUsed")) {
+            info.setCoresUsed(t.get("CoresUsed").getAsDouble());
         }
-        if (root.has("MemoryUsed")) {
-            info.setMemoryUsed(Long.parseLong(root.get("MemoryUsed").getAsString()));
+        if (t.has("CoresTotal")) {
+            info.setCoresTotal(t.get("CoresTotal").getAsDouble());
         }
-        if (root.has("StorageTotal")) {
-            info.setStorageTotal(Long.parseLong(root.get("StorageTotal").getAsString()));
+        if (t.has("MemoryUsed")) {
+            info.setMemoryUsed(parseLongLenient(t.get("MemoryUsed")));
         }
-        if (root.has("StorageUsed")) {
-            info.setStorageUsed(Long.parseLong(root.get("StorageUsed").getAsString()));
+        if (t.has("MemoryLimit")) {
+            info.setMemoryTotal(parseLongLenient(t.get("MemoryLimit")));
         }
-        if (root.has("NodesTotal")) {
-            info.setNodesTotal(root.get("NodesTotal").getAsInt());
+        if (t.has("StorageAllocatedSize")) {
+            info.setStorageUsed(parseLongLenient(t.get("StorageAllocatedSize")));
         }
-        if (root.has("NodesAlive")) {
-            info.setNodesAlive(root.get("NodesAlive").getAsInt());
+        if (t.has("StorageAllocatedLimit")) {
+            info.setStorageTotal(parseLongLenient(t.get("StorageAllocatedLimit")));
         }
-        if (root.has("Overall")) {
-            info.setOverallStatus(root.get("Overall").getAsString());
+        if (t.has("AliveNodes")) {
+            info.setNodesAlive(t.get("AliveNodes").getAsInt());
         }
-        if (root.has("NetworkWriteThroughput")) {
-            info.setNetworkBytesPerSec(Double.parseDouble(root.get("NetworkWriteThroughput").getAsString()));
+        if (t.has("NodeIds") && t.get("NodeIds").isJsonArray()) {
+            info.setNodesTotal(t.getAsJsonArray("NodeIds").size());
+        } else if (t.has("AliveNodes")) {
+            info.setNodesTotal(t.get("AliveNodes").getAsInt());
         }
+        if (t.has("Overall")) {
+            info.setOverallStatus(t.get("Overall").getAsString());
+        }
+        // tenantinfo doesn't expose per-tenant network throughput — leave at 0.
+    }
+
+    private static long parseLongLenient(JsonElement el) {
+        // tenantinfo numbers come as JSON strings (uint64); be defensive for either form.
+        if (el.isJsonPrimitive() && el.getAsJsonPrimitive().isNumber()) {
+            return el.getAsLong();
+        }
+        String s = el.getAsString();
+        return s.isEmpty() ? 0L : Long.parseLong(s);
     }
 
     private void parseNodesInfo(YDBDatabaseLoadInfo info) throws Exception {
