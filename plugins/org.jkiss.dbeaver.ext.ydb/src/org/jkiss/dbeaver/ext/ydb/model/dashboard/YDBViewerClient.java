@@ -123,7 +123,7 @@ public class YDBViewerClient {
         applyTenantMetrics(t, info);
     }
 
-    static void applyTenantMetrics(JsonObject t, YDBDatabaseLoadInfo info) {
+    public static void applyTenantMetrics(JsonObject t, YDBDatabaseLoadInfo info) {
         if (t.has("CoresUsed")) {
             info.setCoresUsed(t.get("CoresUsed").getAsDouble());
         }
